@@ -27,12 +27,19 @@ public class MediaKindDetectorTests
     }
 
     [Fact]
-    public void Video_EndAction_IsPartOfItemIdentity()
+    public void Items_HaveReferenceIdentity_AndIndependentSettings()
     {
+        // Due voci con lo stesso file restano distinte; cambiare le impostazioni non cambia l'identità (hash stabile per la ListBox).
         var a = MediaItem.FromPath("clip.mp4");
-        var b = a with { VideoEnd = VideoEndAction.Loop };
+        var b = MediaItem.FromPath("clip.mp4");
+        var hash = a.GetHashCode();
+
+        a.VideoEnd = VideoEndAction.Loop;
+        a.Volume = 20;
 
         Assert.NotEqual(a, b);
-        Assert.Equal(a.Path, b.Path);
+        Assert.Equal(hash, a.GetHashCode());
+        Assert.Equal(VideoEndAction.ReturnToTappo, b.VideoEnd);
+        Assert.Equal(100, b.Volume);
     }
 }

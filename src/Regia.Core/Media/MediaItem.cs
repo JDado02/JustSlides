@@ -23,16 +23,27 @@ public enum VideoEndAction
     Loop
 }
 
-/// <summary>Un file mandabile in onda.</summary>
-public sealed record MediaItem(string Path, MediaKind Kind)
+/// <summary>
+/// Un file mandabile in onda. È una classe con identità per riferimento (NON un record): le impostazioni per file
+/// (fine video, volume) si modificano sul posto, e un'uguaglianza/hash per valore romperebbe la ListBox, che
+/// perderebbe la voce selezionata appena il volume cambia. La voce in lista e quella in onda sono lo stesso oggetto.
+/// </summary>
+public sealed class MediaItem
 {
-    /// <summary>Fine video (vale solo per i video).</summary>
-    public VideoEndAction VideoEnd { get; init; } = VideoEndAction.ReturnToTappo;
+    public MediaItem(string path, MediaKind kind)
+    {
+        Path = path;
+        Kind = kind;
+    }
 
-    /// <summary>
-    /// Volume del video, 0-100, ricordato per ogni file. Modificabile (anche mentre il video è in onda) e
-    /// volutamente non <c>init</c>: la voce della lista resta la stessa istanza di quella in onda.
-    /// </summary>
+    public string Path { get; }
+
+    public MediaKind Kind { get; }
+
+    /// <summary>Fine video (vale solo per i video), ricordata per ogni file.</summary>
+    public VideoEndAction VideoEnd { get; set; } = VideoEndAction.ReturnToTappo;
+
+    /// <summary>Volume del video, 0-100, ricordato per ogni file.</summary>
     public int Volume { get; set; } = 100;
 
     public string DisplayName => Kind == MediaKind.TestPattern ? "Schermata di prova" : System.IO.Path.GetFileName(Path);

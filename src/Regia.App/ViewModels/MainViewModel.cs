@@ -299,13 +299,10 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        var index = Items.IndexOf(item);
-        if (index < 0)
-            return;
-
-        var updated = item with { VideoEnd = action };
-        Items[index] = updated;
-        SelectedItem = updated;
+        item.VideoEnd = action;
+        OnPropertyChanged(nameof(EndReturnToTappo));
+        OnPropertyChanged(nameof(EndHoldLastFrame));
+        OnPropertyChanged(nameof(EndLoop));
         Log.Information("Fine video di {Item}: {Action}", item.DisplayName, action);
     }
 
