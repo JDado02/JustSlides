@@ -6,7 +6,7 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - **M1 Base e Tappo: COMPLETATA** e testata a mano dall'utente ("funziona tutto"). Commit `3efbf4c`.
 - **M2 Macchina a stati + immagini e PDF: COMPLETATA** e testata a mano dall'utente ("funziona tutto"). Build 0 avvisi, 96 test xUnit verdi. Commit `efdfc2c`.
 - **M3 Video: COMPLETATA** e testata a mano dall'utente ("funziona tutto"). Commit `0d1fcb6`. Rifinitura successiva richiesta dall'utente (volume per video + scorrimento), vedi "Decisioni prese in M3". Build 0 avvisi, 131 test xUnit verdi. Seconda rifinitura (bug Tappo nero, volumi indipendenti, tema) il 2026-10-06, vedi sotto.
-- Prossima: **M4 PptHost**. Non iniziare finché l'utente non approva il piano.
+- Prossima: **M4 PptHost**. Non iniziare finché l'utente non approva il piano. M3 confermata dall'utente ("sembra funzionare tutto").
 
 ## Ambiente
 - .NET SDK 10.0.401, PowerPoint 16 (M365, x64), git 2.53. Identità git impostata solo nel repo (Davide / chatbotdt@gmail.com).
@@ -97,4 +97,4 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - Il pulsante "10 s ▶▶" non è stato provato dal vivo (lo è "◀◀ 10 s", che usa lo stesso `SeekBy`; coperto dai test).
 
 ## Prossimo passo
-Attendere l'esito del test manuale di M3 e correggere eventuali problemi; poi aggiornare questo file (M3 completata) e **proporre il piano di M4 (PptHost)**, attendendo l'approvazione prima di scrivere codice.
+M3 è chiusa e confermata dall'utente (commit `0d1fcb6`, `8d0e268`, `eaeab1a`, `fdf6a57`). Leggere CLAUDE.md e questo file, poi **proporre il piano di M4 (PptHost)** e attendere l'approvazione prima di scrivere codice. Per M4 tenere presenti: R4/R5/R6 qui sopra, la nota sullo z-order (il Tappo non può "possedere" lo slideshow di PowerPoint, è un altro processo) e la trappola `NOTOPMOST`.
