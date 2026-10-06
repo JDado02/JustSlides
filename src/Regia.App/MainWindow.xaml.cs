@@ -38,12 +38,25 @@ public partial class MainWindow : Window
             _viewModel.GoCommand.Execute(null);
             e.Handled = true;
         }
+        else if (Keyboard.Modifiers == ModifierKeys.None && IsPageKey(key) && _viewModel.State is not (WaveState.Tappo or WaveState.Errore))
+        {
+            // Frecce / PageUp / PageDown: pagina o slide (solo con qualcosa in onda; altrimenti scorrono la lista).
+            if (key is Key.Right or Key.Down or Key.PageDown)
+                _viewModel.NextPageCommand.Execute(null);
+            else
+                _viewModel.PreviousPageCommand.Execute(null);
+
+            e.Handled = true;
+        }
         else if (key == Key.F12 && ctrlShift)
         {
             _viewModel.SimulateErrorCommand.Execute(null);
             e.Handled = true;
         }
     }
+
+    private static bool IsPageKey(Key key) =>
+        key is Key.Right or Key.Left or Key.Down or Key.Up or Key.PageDown or Key.PageUp;
 
     protected override void OnClosing(CancelEventArgs e)
     {
@@ -63,6 +76,19 @@ public partial class MainWindow : Window
 
         if (answer != MessageBoxResult.Yes)
             e.Cancel = true;
+    }
+
+    private void OnAddFilesClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Aggiungi file",
+            Multiselect = true,
+            Filter = "Immagini e PDF|*.jpg;*.jpeg;*.png;*.pdf|Tutti i file|*.*"
+        };
+
+        if (dialog.ShowDialog(this) == true)
+            _viewModel.AddFiles(dialog.FileNames);
     }
 
     private void OnSettingsClick(object sender, RoutedEventArgs e)

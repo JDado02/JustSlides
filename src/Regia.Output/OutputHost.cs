@@ -1,6 +1,7 @@
 using System.IO;
 using Regia.Core.Monitors;
 using Regia.Core.Settings;
+using Regia.Output.Content;
 using Regia.Output.Interop;
 using Regia.Output.Tappo;
 using Regia.Output.Transitions;
@@ -47,6 +48,12 @@ public sealed class OutputHost : IDisposable
     public string? Warning { get; private set; }
 
     public MonitorInfo? CurrentMonitor { get; private set; }
+
+    /// <summary>Risoluzione a cui decodificare/renderizzare i contenuti: quella del monitor, 1080p in simulazione.</summary>
+    public OutputSize OutputPixelSize =>
+        Mode == OutputMode.Real && CurrentMonitor is { } monitor
+            ? new OutputSize(monitor.Width, monitor.Height)
+            : new OutputSize(1920, 1080);
 
     /// <summary>
     /// Applica le impostazioni: sceglie reale o simulazione, riposiziona le finestre e ricarica il Tappo.

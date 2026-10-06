@@ -6,9 +6,12 @@ using Microsoft.Extensions.Hosting;
 using Regia.App.ViewModels;
 using Regia.Core.Logging;
 using Regia.Core.Settings;
+using Regia.Core.Wave;
 using Regia.Output;
+using Regia.Output.Content;
 using Regia.Output.Interop;
 using Regia.Output.Tappo;
+using Regia.Output.Transitions;
 using Serilog;
 
 namespace Regia.App;
@@ -52,6 +55,11 @@ public partial class App : Application
                     services.AddSingleton(settings);
                     services.AddSingleton<VlcService>();
                     services.AddSingleton<OutputHost>();
+                    services.AddSingleton<WaveStateMachine>();
+                    services.AddSingleton<TappoTransitions>();
+                    services.AddSingleton<ITappoTransitions>(sp => sp.GetRequiredService<TappoTransitions>());
+                    services.AddSingleton<IContentPresenterFactory, ContentPresenterFactory>();
+                    services.AddSingleton<WaveController>();
                     services.AddSingleton<MainViewModel>();
                     services.AddSingleton<MainWindow>();
                 })

@@ -1,11 +1,8 @@
 <Window x:Class="Regia.Output.Windows.ContentWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:tp="clr-namespace:Regia.Output.TestPattern"
         Title="Regia - Output contenuto"
         WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False" ShowActivated="False"
         Background="Black" Focusable="False" Width="640" Height="360">
-  <Grid x:Name="Host">
-    <tp:TestPatternView x:Name="Pattern" />
-  </Grid>
+  <Grid x:Name="Host" Background="Black" />
 </Window>

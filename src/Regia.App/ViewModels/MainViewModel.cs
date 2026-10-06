@@ -1,23 +1,28 @@
+using System.Collections.ObjectModel;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Regia.Core.Media;
 using Regia.Core.Settings;
 using Regia.Core.Wave;
 using Regia.Output;
 using Regia.Output.Monitors;
+using Regia.Output.Transitions;
 using Serilog;
 
 namespace Regia.App.ViewModels;
 
 /// <summary>
-/// Milestone 1: stato onda minimale (la macchina a stati completa arriva in M2) e comandi
-/// GO di prova / Torna al Tappo / PANIC. I comandi non validi nello stato corrente vengono
-/// ignorati e loggati.
+/// ViewModel della regia. Lo stato dell'onda vive in <see cref="WaveController"/> (Core): qui si
+/// espongono solo comandi e proprietà per la UI. La lista dei file è provvisoria (la scaletta vera
+/// arriva in M6): non viene salvata.
 /// </summary>
 public sealed partial class MainViewModel : ObservableObject
 {
     private readonly OutputHost _output;
     private readonly SettingsStore _store;
+    private readonly WaveController _wave;
+    private readonly TappoTransitions _transitions;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StateText))]
@@ -27,16 +32,40 @@ public sealed partial class MainViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasWarning))]
     private string? _warning;
 
-    public MainViewModel(OutputHost output, SettingsStore store, AppSettings settings)
+    [ObservableProperty]
+    private MediaItem? _selectedItem;
+
+    public MainViewModel(
+        OutputHost output,
+        SettingsStore store,
+        AppSettings settings,
+        WaveController wave,
+        TappoTransitions transitions)
     {
         _output = output;
         _store = store;
+        _wave = wave;
+        _transitions = transitions;
         Settings = settings;
+
+        Items.Add(MediaItem.TestPattern);
+        SelectedItem = Items[0];
+
+        _wave.StateChanged += (_, now) => State = now;
+        _wave.PageChanged += OnPageChanged;
+        _wave.ErrorOccurred += message => Warning = message;
     }
 
     public AppSettings Settings { get; private set; }
 
+    public ObservableCollection<MediaItem> Items { get; } = [];
+
     public bool HasWarning => !string.IsNullOrEmpty(Warning);
+
+    /// <summary>"Pagina N/M" per i PDF; vuoto per i contenuti senza pagine.</summary>
+    public string PageText => _wave.Page is { } page ? $"Pagina {page.Current} / {page.Total}" : "";
+
+    public bool HasPage => _wave.Page is not null;
 
     public string StateText => State switch
     {
@@ -55,81 +84,79 @@ public sealed partial class MainViewModel : ObservableObject
         await ApplyOutputAsync();
     }
 
+    /// <summary>Aggiunge file alla lista provvisoria; quelli non gestiti vengono scartati con un avviso.</summary>
+    public void AddFiles(IEnumerable<string> paths)
+    {
+        var rejected = new List<string>();
+
+        foreach (var path in paths)
+        {
+            var item = MediaItem.FromPath(path);
+            if (item.Kind is MediaKind.Image or MediaKind.Pdf)
+            {
+                Items.Add(item);
+                SelectedItem = item;
+                Log.Information("File aggiunto alla lista: {Path} ({Kind})", path, item.Kind);
+            }
+            else
+            {
+                rejected.Add(item.DisplayName);
+                Log.Warning("File non supportato in questa versione: {Path} ({Kind})", path, item.Kind);
+            }
+        }
+
+        if (rejected.Count > 0)
+            Warning = "File non supportati (per ora solo JPG, PNG e PDF): " + string.Join(", ", rejected);
+    }
+
+    [RelayCommand]
+    private void RemoveSelected()
+    {
+        // Il file in onda non si toglie dalla lista: la regia lo sta ancora usando.
+        if (SelectedItem is null || SelectedItem.Kind == MediaKind.TestPattern || ReferenceEquals(SelectedItem, _wave.CurrentItem))
+            return;
+
+        var index = Items.IndexOf(SelectedItem);
+        Items.Remove(SelectedItem);
+        SelectedItem = Items.Count > 0 ? Items[Math.Min(index, Items.Count - 1)] : null;
+    }
+
     [RelayCommand]
     private async Task GoAsync()
     {
-        if (State is not (WaveState.Tappo or WaveState.Errore))
+        if (SelectedItem is null)
         {
-            Log.Warning("Comando GO ignorato: stato {State}", State);
+            Log.Warning("Comando GO ignorato: nessun file selezionato");
             return;
         }
 
-        try
-        {
-            Log.Information("GO: contenuto di prova in onda");
-            State = WaveState.InTransizioneIn;
-
-            var completed = await _output.Fader.FadeOutAsync(Settings.FadeDurationMs, Settings.HardCut);
-            if (!completed)
-            {
-                Log.Information("GO: dissolvenza interrotta");
-                return;
-            }
-
-            State = WaveState.InOnda;
-            Log.Information("In onda: contenuto di prova");
-        }
-        catch (Exception ex)
-        {
-            HandleError("GO", ex);
-        }
+        Warning = _output.Warning;
+        await _wave.GoAsync(SelectedItem);
     }
 
     [RelayCommand]
     private async Task BackToTappoAsync()
     {
-        if (State != WaveState.InOnda)
-        {
-            Log.Warning("Comando Torna al Tappo ignorato: stato {State}", State);
-            return;
-        }
-
-        try
-        {
-            Log.Information("Ritorno al Tappo");
-            State = WaveState.InTransizioneOut;
-
-            var completed = await _output.Fader.FadeInAsync(Settings.FadeDurationMs, Settings.HardCut);
-            if (!completed)
-            {
-                Log.Information("Ritorno al Tappo: dissolvenza interrotta");
-                return;
-            }
-
-            State = WaveState.Tappo;
-            Log.Information("Sul Tappo");
-        }
-        catch (Exception ex)
-        {
-            HandleError("Torna al Tappo", ex);
-        }
+        await _wave.StopAsync();
     }
+
+    [RelayCommand]
+    private void NextPage() => _wave.Next();
+
+    [RelayCommand]
+    private void PreviousPage() => _wave.Previous();
 
     /// <summary>PANIC: Tappo immediato da qualsiasi stato.</summary>
     [RelayCommand]
     private void Panic()
     {
-        Log.Warning("PANIC (stato precedente: {State})", State);
-        try
-        {
-            _output.Fader.Panic();
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Errore durante il PANIC");
-        }
+        _wave.Panic();
+    }
 
-        State = WaveState.Tappo;
+    private void OnPageChanged()
+    {
+        OnPropertyChanged(nameof(PageText));
+        OnPropertyChanged(nameof(HasPage));
     }
 
     /// <summary>Solleva un'eccezione non gestita sul thread UI: serve a provare gli handler globali.</summary>
@@ -144,19 +171,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Errore durante la proiezione: Tappo immediato, log, la regia resta operativa.</summary>
     public void HandleError(string context, Exception ex)
     {
-        Log.Error(ex, "Errore in {Context}: ritorno al Tappo", context);
-
-        try
-        {
-            _output.Fader.Panic();
-        }
-        catch (Exception panicEx)
-        {
-            Log.Error(panicEx, "Errore anche nel ritorno al Tappo");
-        }
-
-        State = WaveState.Errore;
-        Warning = $"Errore ({context}): {ex.Message}";
+        _wave.Fail(context, ex);
     }
 
     public SettingsViewModel CreateSettingsViewModel()
@@ -172,6 +187,7 @@ public sealed partial class MainViewModel : ObservableObject
     private async Task<string?> ApplySettingsAsync(AppSettings settings)
     {
         Settings = settings.Normalize();
+        _transitions.Settings = Settings;
 
         try
         {
