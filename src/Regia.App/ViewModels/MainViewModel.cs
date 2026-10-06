@@ -6,6 +6,8 @@ using Regia.Core.Media;
 using Regia.Core.Settings;
 using Regia.Core.Wave;
 using Regia.Output;
+using Regia.Output.Audio;
+using Regia.Output.Content;
 using Regia.Output.Monitors;
 using Regia.Output.Transitions;
 using Serilog;
@@ -23,6 +25,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly SettingsStore _store;
     private readonly WaveController _wave;
     private readonly TappoTransitions _transitions;
+    private readonly ContentPresenterFactory _factory;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StateText))]
@@ -33,19 +36,31 @@ public sealed partial class MainViewModel : ObservableObject
     private string? _warning;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSelectedVideo))]
+    [NotifyPropertyChangedFor(nameof(EndReturnToTappo))]
+    [NotifyPropertyChangedFor(nameof(EndHoldLastFrame))]
+    [NotifyPropertyChangedFor(nameof(EndLoop))]
     private MediaItem? _selectedItem;
+
+    [ObservableProperty]
+    private int _volume = 100;
+
+    [ObservableProperty]
+    private bool _isMuted;
 
     public MainViewModel(
         OutputHost output,
         SettingsStore store,
         AppSettings settings,
         WaveController wave,
-        TappoTransitions transitions)
+        TappoTransitions transitions,
+        ContentPresenterFactory factory)
     {
         _output = output;
         _store = store;
         _wave = wave;
         _transitions = transitions;
+        _factory = factory;
         Settings = settings;
 
         Items.Add(MediaItem.TestPattern);
@@ -53,7 +68,9 @@ public sealed partial class MainViewModel : ObservableObject
 
         _wave.StateChanged += (_, now) => State = now;
         _wave.PageChanged += OnPageChanged;
+        _wave.PlaybackChanged += OnPlaybackChanged;
         _wave.ErrorOccurred += message => Warning = message;
+        _factory.Warning += message => Warning = message;
     }
 
     public AppSettings Settings { get; private set; }
@@ -66,6 +83,37 @@ public sealed partial class MainViewModel : ObservableObject
     public string PageText => _wave.Page is { } page ? $"Pagina {page.Current} / {page.Total}" : "";
 
     public bool HasPage => _wave.Page is not null;
+
+    /// <summary>C'è un video in onda (o in entrata): si mostrano countdown e comandi di riproduzione.</summary>
+    public bool IsVideoOnAir => _wave.Progress is not null;
+
+    /// <summary>Countdown "tempo rimanente" del video in onda.</summary>
+    public string RemainingText => _wave.Progress is { } p ? "-" + FormatTime(p.Remaining) : "";
+
+    /// <summary>"Trascorso / durata" del video in onda.</summary>
+    public string ElapsedText => _wave.Progress is { } p ? $"{FormatTime(p.Elapsed)} / {FormatTime(p.Duration)}" : "";
+
+    public string PauseButtonText => _wave.IsPaused ? "PLAY" : "PAUSA";
+
+    public bool IsSelectedVideo => SelectedItem?.Kind == MediaKind.Video;
+
+    public bool EndReturnToTappo
+    {
+        get => SelectedItem?.VideoEnd == VideoEndAction.ReturnToTappo;
+        set => SetVideoEnd(value, VideoEndAction.ReturnToTappo);
+    }
+
+    public bool EndHoldLastFrame
+    {
+        get => SelectedItem?.VideoEnd == VideoEndAction.HoldLastFrame;
+        set => SetVideoEnd(value, VideoEndAction.HoldLastFrame);
+    }
+
+    public bool EndLoop
+    {
+        get => SelectedItem?.VideoEnd == VideoEndAction.Loop;
+        set => SetVideoEnd(value, VideoEndAction.Loop);
+    }
 
     public string StateText => State switch
     {
@@ -92,7 +140,7 @@ public sealed partial class MainViewModel : ObservableObject
         foreach (var path in paths)
         {
             var item = MediaItem.FromPath(path);
-            if (item.Kind is MediaKind.Image or MediaKind.Pdf)
+            if (item.Kind is MediaKind.Image or MediaKind.Pdf or MediaKind.Video)
             {
                 Items.Add(item);
                 SelectedItem = item;
@@ -106,7 +154,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         if (rejected.Count > 0)
-            Warning = "File non supportati (per ora solo JPG, PNG e PDF): " + string.Join(", ", rejected);
+            Warning = "File non supportati (per ora solo JPG, PNG, PDF e video): " + string.Join(", ", rejected);
     }
 
     [RelayCommand]
@@ -139,6 +187,49 @@ public sealed partial class MainViewModel : ObservableObject
     {
         await _wave.StopAsync();
     }
+
+    [RelayCommand]
+    private void TogglePause() => _wave.TogglePause();
+
+    partial void OnVolumeChanged(int value) => _wave.SetVolume(value);
+
+    partial void OnIsMutedChanged(bool value) => _wave.SetMuted(value);
+
+    /// <summary>Cambia l'azione di fine video del file selezionato (vale dal prossimo GO; non per il file in onda).</summary>
+    private void SetVideoEnd(bool selected, VideoEndAction action)
+    {
+        if (!selected || SelectedItem is not { Kind: MediaKind.Video } item || item.VideoEnd == action)
+            return;
+
+        if (ReferenceEquals(item, _wave.CurrentItem))
+        {
+            Warning = "Il video è in onda: l'azione di fine si cambia dopo averlo fermato.";
+            OnPropertyChanged(nameof(EndReturnToTappo));
+            OnPropertyChanged(nameof(EndHoldLastFrame));
+            OnPropertyChanged(nameof(EndLoop));
+            return;
+        }
+
+        var index = Items.IndexOf(item);
+        if (index < 0)
+            return;
+
+        var updated = item with { VideoEnd = action };
+        Items[index] = updated;
+        SelectedItem = updated;
+        Log.Information("Fine video di {Item}: {Action}", item.DisplayName, action);
+    }
+
+    private void OnPlaybackChanged()
+    {
+        OnPropertyChanged(nameof(IsVideoOnAir));
+        OnPropertyChanged(nameof(RemainingText));
+        OnPropertyChanged(nameof(ElapsedText));
+        OnPropertyChanged(nameof(PauseButtonText));
+    }
+
+    private static string FormatTime(TimeSpan t) =>
+        t.TotalHours >= 1 ? $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}" : $"{t.Minutes:00}:{t.Seconds:00}";
 
     [RelayCommand]
     private void NextPage() => _wave.Next();
@@ -179,6 +270,7 @@ public sealed partial class MainViewModel : ObservableObject
         return new SettingsViewModel(
             Settings,
             DisplayEnumerator.GetMonitors(),
+            AudioDeviceEnumerator.GetOutputDevices(),
             ApplySettingsAsync,
             () => _output.IdentifyMonitors(DisplayEnumerator.GetMonitors()));
     }
@@ -188,6 +280,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         Settings = settings.Normalize();
         _transitions.Settings = Settings;
+        _factory.Settings = Settings;
 
         try
         {

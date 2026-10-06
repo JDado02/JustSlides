@@ -92,6 +92,27 @@ public class WaveStateMachineTests
             seen);
     }
 
+    [Theory]
+    [InlineData(WaveState.Tappo)]
+    [InlineData(WaveState.Caricamento)]
+    [InlineData(WaveState.InTransizioneIn)]
+    [InlineData(WaveState.InTransizioneOut)]
+    [InlineData(WaveState.Errore)]
+    public void Transport_IgnoredOutsideOnda(WaveState state)
+    {
+        var m = In(state);
+        Assert.False(m.Fire(WaveTrigger.Transport));
+        Assert.Equal(state, m.State);
+    }
+
+    [Fact]
+    public void Transport_ValidOnAir_KeepsState()
+    {
+        var m = In(WaveState.InOnda);
+        Assert.True(m.Fire(WaveTrigger.Transport));
+        Assert.Equal(WaveState.InOnda, m.State);
+    }
+
     [Fact]
     public void Go_WhileLoading_IsIgnored()
     {

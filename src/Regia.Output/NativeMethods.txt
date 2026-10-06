@@ -16,3 +16,5 @@ SetForegroundWindow
 ShowWindow
 IsIconic
 WINDOW_EX_STYLE
+CreateWindowEx
+DestroyWindow

@@ -15,8 +15,12 @@ public sealed class WaveController
     private readonly IContentPresenterFactory _factory;
 
     private IContentPresenter? _current;
+    private IPlaybackContent? _playback;
     private CancellationTokenSource _cts = new();
     private int _generation;
+    private bool _endPending;
+    private int _volume = 100;
+    private bool _muted;
 
     public WaveController(WaveStateMachine machine, ITappoTransitions tappo, IContentPresenterFactory factory)
     {
@@ -32,9 +36,17 @@ public sealed class WaveController
 
     public PageInfo? Page => _current?.Page;
 
+    /// <summary>Tempo trascorso / durata del video in onda; null per gli altri contenuti.</summary>
+    public PlaybackProgress? Progress => _playback?.Progress;
+
+    public bool IsPaused => _playback?.IsPaused ?? false;
+
     public event Action<WaveState, WaveState>? StateChanged;
 
     public event Action? PageChanged;
+
+    /// <summary>Progresso del video, pausa/ripresa o fine: la UI rilegge <see cref="Progress"/> e <see cref="IsPaused"/>.</summary>
+    public event Action? PlaybackChanged;
 
     /// <summary>Messaggio per l'operatore quando qualcosa è andato storto.</summary>
     public event Action<string>? ErrorOccurred;
@@ -57,7 +69,7 @@ public sealed class WaveController
             {
                 // Cambio file: Tappo 0→1, solo dopo si chiude il vecchio contenuto.
                 _machine.Fire(WaveTrigger.Go);
-                var covered = await _tappo.CoverAsync();
+                var covered = await CoverWithAudioFadeAsync();
                 if (!covered || generation != _generation)
                     return;
 
@@ -86,7 +98,7 @@ public sealed class WaveController
 
         try
         {
-            var covered = await _tappo.CoverAsync();
+            var covered = await CoverWithAudioFadeAsync();
             if (!covered || generation != _generation)
                 return;
 
@@ -98,6 +110,43 @@ public sealed class WaveController
             if (generation == _generation)
                 Fail("Torna al Tappo", ex);
         }
+    }
+
+    /// <summary>Play / Pausa del video in onda; ignorato (e loggato) negli altri casi.</summary>
+    public bool TogglePause()
+    {
+        if (_playback is null || !_machine.CanFire(WaveTrigger.Transport))
+        {
+            Log.Warning("Comando Play/Pausa ignorato: stato {State}", _machine.State);
+            return false;
+        }
+
+        try
+        {
+            _machine.Fire(WaveTrigger.Transport);
+            _playback.TogglePause();
+            Log.Information("Video: {State}", _playback.IsPaused ? "pausa" : "play");
+            PlaybackChanged?.Invoke();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Fail("Play/Pausa", ex);
+            return false;
+        }
+    }
+
+    /// <summary>Volume 0-100 del contenuto in onda; vale anche per i video successivi.</summary>
+    public void SetVolume(int volume)
+    {
+        _volume = Math.Clamp(volume, 0, 100);
+        TryApply(p => p.SetVolume(_volume), "Volume");
+    }
+
+    public void SetMuted(bool muted)
+    {
+        _muted = muted;
+        TryApply(p => p.SetMuted(_muted), "Mute");
     }
 
     public bool Next() => Navigate(p => p.Next(), "Avanti");
@@ -164,6 +213,19 @@ public sealed class WaveController
         CurrentItem = item;
         presenter.PageChanged += OnPresenterPageChanged;
 
+        if (presenter is IPlaybackContent playback)
+        {
+            _playback = playback;
+            playback.ProgressChanged += OnPlaybackProgress;
+            playback.EndRequested += OnPlaybackEnded;
+            playback.Faulted += OnPlaybackFaulted;
+            TryApply(p =>
+            {
+                p.SetVolume(_volume);
+                p.SetMuted(_muted);
+            }, "Volume iniziale");
+        }
+
         try
         {
             await presenter.LoadAsync(token);
@@ -192,13 +254,102 @@ public sealed class WaveController
         _machine.Fire(WaveTrigger.ContentReady);
         PageChanged?.Invoke();
 
+        // Il video parte con la dissolvenza (movimento e audio entrano insieme al Tappo che sfuma).
+        if (_playback is { } playing && ReferenceEquals(_current, playing))
+        {
+            try
+            {
+                playing.BeginPlayback();
+            }
+            catch (Exception ex)
+            {
+                if (generation == _generation)
+                    Fail("Avvio video", ex);
+                return;
+            }
+        }
+
         var revealed = await _tappo.RevealAsync();
         if (!revealed || generation != _generation)
             return;
 
         _machine.Fire(WaveTrigger.FadeCompleted);
         Log.Information("In onda: {Item}", item.DisplayName);
+        PlaybackChanged?.Invoke();
+
+        // Video più corto della dissolvenza: la fine è arrivata mentre eravamo in transizione.
+        if (_endPending)
+        {
+            _endPending = false;
+            await StopAsync();
+        }
     }
+
+    /// <summary>Tappo 0→1 con, in parallelo, la rampa audio a zero del video in onda.</summary>
+    private async Task<bool> CoverWithAudioFadeAsync()
+    {
+        var audio = Task.CompletedTask;
+        if (_playback is { } playback)
+        {
+            try
+            {
+                audio = playback.FadeAudioOutAsync(_tappo.FadeDuration);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Fade audio non avviato");
+            }
+        }
+
+        var covered = await _tappo.CoverAsync();
+
+        try
+        {
+            await audio;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Errore nel fade audio");
+        }
+
+        return covered;
+    }
+
+    private void TryApply(Action<IPlaybackContent> action, string name)
+    {
+        if (_playback is null)
+            return;
+
+        try
+        {
+            action(_playback);
+        }
+        catch (Exception ex)
+        {
+            // Un volume che non si applica non deve fermare la regia.
+            Log.Warning(ex, "{Name} non applicato", name);
+        }
+    }
+
+    private void OnPlaybackProgress() => PlaybackChanged?.Invoke();
+
+    private void OnPlaybackEnded()
+    {
+        Log.Information("Video terminato: {Item}", CurrentItem?.DisplayName);
+        PlaybackChanged?.Invoke();
+
+        switch (_machine.State)
+        {
+            case WaveState.InOnda:
+                _ = StopAsync();
+                break;
+            case WaveState.InTransizioneIn:
+                _endPending = true; // si esegue appena la dissolvenza in entrata è finita
+                break;
+        }
+    }
+
+    private void OnPlaybackFaulted(Exception ex) => Fail("Video", ex);
 
     private void FailLoad(MediaItem item, Exception ex)
     {
@@ -239,6 +390,15 @@ public sealed class WaveController
         var presenter = _current;
         _current = null;
         CurrentItem = null;
+        _endPending = false;
+
+        if (_playback is { } playback)
+        {
+            playback.ProgressChanged -= OnPlaybackProgress;
+            playback.EndRequested -= OnPlaybackEnded;
+            playback.Faulted -= OnPlaybackFaulted;
+            _playback = null;
+        }
 
         if (presenter is null)
             return;
@@ -254,6 +414,7 @@ public sealed class WaveController
         }
 
         PageChanged?.Invoke();
+        PlaybackChanged?.Invoke();
     }
 
     private void OnPresenterPageChanged() => PageChanged?.Invoke();

@@ -4,5 +4,9 @@
         Title="Regia - Output contenuto"
         WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False" ShowActivated="False"
         Background="Black" Focusable="False" Width="640" Height="360">
-  <Grid x:Name="Host" Background="Black" />
+  <Grid Background="Black">
+    <!-- Elementi in via di chiusura (finestre video con VLC che sta ancora fermandosi): nascosti finché non si possono distruggere. -->
+    <Grid x:Name="Retired" Visibility="Collapsed" />
+    <Grid x:Name="Host" Background="Black" />
+  </Grid>
 </Window>

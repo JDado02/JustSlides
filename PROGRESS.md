@@ -5,7 +5,8 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 ## Stato
 - **M1 Base e Tappo: COMPLETATA** e testata a mano dall'utente ("funziona tutto"). Commit `3efbf4c`.
 - **M2 Macchina a stati + immagini e PDF: COMPLETATA** e testata a mano dall'utente ("funziona tutto"). Build 0 avvisi, 96 test xUnit verdi. Commit `efdfc2c`.
-- Prossima: **M3 Video**. Non iniziata: serve prima il piano approvato.
+- **M3 Video: IMPLEMENTATA, in attesa del test manuale dell'utente** (checklist data a fine milestone). Build 0 avvisi, 123 test xUnit verdi. Non provata con un video reale sul monitor di output (solo avvio dell'app verificato).
+- Prossima: **M4 PptHost**. Non iniziare finché l'utente non conferma i test di M3 e approva il piano.
 
 ## Ambiente
 - .NET SDK 10.0.401, PowerPoint 16 (M365, x64), git 2.53. Identità git impostata solo nel repo (Davide / chatbotdt@gmail.com).
@@ -17,7 +18,7 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 
 ## Struttura
 - `Regia.Core` (net10.0): `AppSettings`, `SettingsStore`, `MonitorId/MonitorInfo/MonitorMatcher`, `LogSetup`; `Wave/`: `WaveState`, `WaveTrigger`, `WaveStateMachine` (tabella transizioni), `WaveController` (orchestratore async), `IWaveOutput.cs` (`ITappoTransitions`, `IContentPresenter`, `IContentPresenterFactory`, `PageInfo`); `Media/`: `MediaItem`, `MediaKind`, `MediaKindDetector`.
-- `Regia.Output` (net10.0-windows10.0.19041.0, WPF): `OutputHost`, `ContentWindow`, `TappoWindow`, `SimulationFrameWindow`, `IdentifyOverlay`, `TappoFader`, `ImageTappoSource`, `VideoTappoSource`, `VlcService`, `DisplayEnumerator`, `TestPatternView`, interop Win32 via CsWin32; `Content/`: `ImagePresenter`, `PdfPresenter`, `PdfPageCache`, `TestPatternPresenter`, `ContentPresenterFactory`, `RenderWait`; `Transitions/TappoTransitions` (adattatore di `TappoFader`).
+- `Regia.Output` (net10.0-windows10.0.19041.0, WPF): `Audio/AudioDeviceEnumerator` (NAudio.Wasapi), `Content/VideoPresenter` + `VideoHost` (HwndHost), `OutputHost`, `ContentWindow`, `TappoWindow`, `SimulationFrameWindow`, `IdentifyOverlay`, `TappoFader`, `ImageTappoSource`, `VideoTappoSource`, `VlcService`, `DisplayEnumerator`, `TestPatternView`, interop Win32 via CsWin32; `Content/`: `ImagePresenter`, `PdfPresenter`, `PdfPageCache`, `TestPatternPresenter`, `ContentPresenterFactory`, `RenderWait`; `Transitions/TappoTransitions` (adattatore di `TappoFader`).
 - `Regia.App`: `App.xaml.cs` (mutex, log, handler globali, anti-standby, DI), `MainViewModel`, `SettingsViewModel`, `MainWindow`, `SettingsWindow`, tema `Themes/Dark.xaml`.
 - `Regia.Tests` (net10.0, referenzia solo Core): `SettingsStoreTests`, `MonitorMatcherTests`.
 - `Regia.PptHost` non esiste ancora (M4).
@@ -40,6 +41,24 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - "Pronto" = 2 cicli di `CompositionTarget.Rendering` dopo aver messo il contenuto (tetto 1 s).
 - UI di M2 provvisoria: lista file non salvata (voce fissa "Schermata di prova" + file aggiunti), frecce/PageUp/PageDown navigano solo se qualcosa è in onda (altrimenti scorrono la lista). Video/PPT rifiutati con avviso in lista e `NotSupportedException` nella factory (M3/M4).
 
+## Decisioni prese in M3 (da rispettare)
+- **Niente LibVLCSharp.WPF / VideoView**: `VideoHost` è un `HwndHost` minimo (finestra figlia "static" creata con CsWin32) e `MediaPlayer.Hwnd` punta lì. Una sola finestra figlia nella finestra contenuto, nessun rischio di z-order col Tappo. Il Tappo video resta a video callbacks (decisione M1).
+- **Interfaccia `IPlaybackContent`** (Core, estende `IContentPresenter`): il controller la riconosce con `is`; immagini/PDF non cambiano. Eventi `ProgressChanged`/`EndRequested`/`Faulted` sul thread UI, mai dopo `Close()`.
+- **Sequenza video**: `LoadAsync` = Play a volume 0 -> primo `Vout` -> pausa sul primo fotogramma (pronto, muto). `BeginPlayback()` (volume + play) è chiamato **prima** di `RevealAsync`: il video parte con la dissolvenza. Senza `Vout` entro 3 s dopo `Playing` il file si considera solo audio e si prosegue. Timeout caricamento 10 s.
+- **Fine video**: scelta dell'utente = "fermo sull'ultimo fotogramma, poi dissolvenza". Dato che a `EndReached` la finestra VLC diventa nera, il presenter fa polling a 100 ms e mette in pausa quando mancano 120 ms alla fine (`EndMarginMs`); `EndReached` è solo rete di sicurezza (log di avviso). `VideoEndAction`: `ReturnToTappo` (default) / `HoldLastFrame` / `Loop` (`:input-repeat=65535`), per file, in `MediaItem.VideoEnd` (record: cambiarlo = `with`, vale dal GO successivo).
+- **Fine durante la dissolvenza in entrata** (video più corto del fade): `_endPending` nel controller, lo Stop parte appena lo stato è `InOnda`.
+- **Fade audio** = rampa del volume VLC (timer 30 ms) in parallelo a `CoverAsync`, durata = `ITappoTransitions.FadeDuration` (zero con taglio secco). PANIC: nessun fade, volume a 0 e chiusura.
+- **Chiusura sicura**: `Close()` azzera il volume, fa Stop/Dispose del player in `Task.Run`; la finestra video passa a `ContentWindow.Retire()` (griglia `Retired`, nascosta) e viene distrutta solo a Stop finito.
+- **Dispositivo audio**: `AppSettings.AudioDeviceId/Name` (ID endpoint CoreAudio, vuoto = predefinito Windows). `SetAudioOutput("mmdevice")` prima del Play, `SetOutputDevice(id)` dopo `Playing`. Dispositivo non più collegato -> predefinito + avviso arancione (`ContentPresenterFactory.Warning`). Lista nelle impostazioni = ListBox (nessun tema per ComboBox in `Dark.xaml`: non usarne senza stilizzarlo).
+- Volume/Mute: stato nel `WaveController` (`SetVolume`/`SetMuted`), riapplicato a ogni video; nuovo trigger `Transport` (Play/Pausa) valido solo in `InOnda`.
+- NuGet aggiunto: `NAudio.Wasapi` 2.4.0 (la 3.x è una ristrutturazione, non usata).
+- UI provvisoria di M3: pannello video in `MainWindow` (countdown, trascorso/durata, Play/Pausa, volume, Mute) e scelta "A fine video" (RadioButton) per il file selezionato; il pannello Program vero è M7.
+
+## Da verificare a mano in M3 (non provabile da me)
+- R1: l'ultimo fotogramma resta davvero visibile (non nero) con "Torna al Tappo" e "Fermo".
+- R2/R3: volume 0 durante il caricamento (nessun suono sotto il Tappo) e uscita sul dispositivo scelto.
+- CPU/GPU con video 4K/HEVC a pieno schermo.
+
 ## Trappole incontrate (evitare di rifarle)
 - `dotnet new xunit3` non esiste: il csproj dei test è scritto a mano; serve `<Using Include="Xunit" />`.
 - Nei progetti WPF `System.IO` non è un using implicito: aggiungerlo a mano. `MediaPlayer` è ambiguo tra WPF e LibVLCSharp (alias in `VideoTappoSource`).
@@ -48,6 +67,8 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - In PowerShell `FindWindow(null, ...)` va chiamato con `[NullString]::Value`, non `$null`.
 - `winget` nel contesto `!` non può rispondere a prompt: servono `--source winget --accept-package-agreements --accept-source-agreements`.
 - Versioni NuGet: `dotnet package search` dà le più vecchie; usare l'indice `api.nuget.org/v3-flatcontainer`.
+- `Dispatcher.Yield` è statico (`await Dispatcher.Yield(...)`); `MediaPlayer.SetOutputDevice` in LibVLCSharp 3.10 restituisce `void`.
+- Negli script Python di patch su file del repo aprire con `newline=''` (i file in working copy sono LF, git li converte in CRLF).
 
 ## Rischi della specifica già discussi (non ancora implementati)
 - **R3 hotkey globali** (M7): `RegisterHotKey` su tasti nudi li ruba al sistema; proposta: hook `WH_KEYBOARD_LL` attivo solo se in primo piano regia/output/slideshow, e `RegisterHotKey` solo con modificatori.
@@ -62,4 +83,4 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - La CPU del Tappo video a pieno schermo non è stata misurata con precisione (obiettivo < 10%).
 
 ## Prossimo passo
-Leggere CLAUDE.md e questo file, poi **proporre il piano di M3 (Video)** e attendere l'approvazione prima di scrivere codice.
+Attendere l'esito del test manuale di M3 e correggere eventuali problemi; poi aggiornare questo file (M3 completata) e **proporre il piano di M4 (PptHost)**, attendendo l'approvazione prima di scrivere codice.

@@ -58,7 +58,8 @@ public partial class App : Application
                     services.AddSingleton<WaveStateMachine>();
                     services.AddSingleton<TappoTransitions>();
                     services.AddSingleton<ITappoTransitions>(sp => sp.GetRequiredService<TappoTransitions>());
-                    services.AddSingleton<IContentPresenterFactory, ContentPresenterFactory>();
+                    services.AddSingleton<ContentPresenterFactory>();
+                    services.AddSingleton<IContentPresenterFactory>(sp => sp.GetRequiredService<ContentPresenterFactory>());
                     services.AddSingleton<WaveController>();
                     services.AddSingleton<MainViewModel>();
                     services.AddSingleton<MainWindow>();

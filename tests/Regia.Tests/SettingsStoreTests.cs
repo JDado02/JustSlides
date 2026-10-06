@@ -35,7 +35,9 @@ public sealed class SettingsStoreTests : IDisposable
             SimulationMode = true,
             Tappo = new TappoSettings { Kind = TappoKind.Video, Path = @"C:\tappo.mp4" },
             FadeDurationMs = 700,
-            HardCut = true
+            HardCut = true,
+            AudioDeviceId = "{0.0.0.00000000}.{abc}",
+            AudioDeviceName = "Altoparlanti (Roland)"
         };
 
         store.Save(original);

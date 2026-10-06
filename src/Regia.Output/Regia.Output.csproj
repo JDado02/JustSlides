@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Regia.Core\Regia.Core.csproj" />
     <PackageReference Include="LibVLCSharp" />
+    <PackageReference Include="NAudio.Wasapi" />
     <PackageReference Include="VideoLAN.LibVLC.Windows" />
     <PackageReference Include="Microsoft.Windows.CsWin32" PrivateAssets="all" />
     <PackageReference Include="Serilog" />

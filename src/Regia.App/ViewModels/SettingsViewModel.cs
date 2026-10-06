@@ -4,8 +4,12 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Regia.Core.Monitors;
 using Regia.Core.Settings;
+using Regia.Output.Audio;
 
 namespace Regia.App.ViewModels;
+
+/// <summary>Voce della lista "Uscita audio". Id vuoto = predefinito di Windows.</summary>
+public sealed record AudioDeviceItem(string Id, string Name, string Display);
 
 public sealed class MonitorItem
 {
@@ -48,6 +52,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     private string _tappoPath = "";
 
     [ObservableProperty]
+    private AudioDeviceItem? _selectedAudioDevice;
+
+    [ObservableProperty]
     private double _fadeDurationMs;
 
     [ObservableProperty]
@@ -59,6 +66,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     public SettingsViewModel(
         AppSettings current,
         IReadOnlyList<MonitorInfo> monitors,
+        IReadOnlyList<AudioDeviceInfo> audioDevices,
         Func<AppSettings, Task<string?>> apply,
         Action identify)
     {
@@ -75,6 +83,15 @@ public sealed partial class SettingsViewModel : ObservableObject
         var match = MonitorMatcher.Find(current.OutputMonitor, monitors);
         SelectedMonitor = match is null ? null : Monitors.FirstOrDefault(m => m.Info == match);
 
+        AudioDevices.Add(new AudioDeviceItem("", "", "Predefinito di Windows"));
+        foreach (var device in audioDevices)
+            AudioDevices.Add(new AudioDeviceItem(device.Id, device.Name, device.IsDefault ? device.Name + " (predefinito)" : device.Name));
+
+        // Dispositivo salvato ma non collegato ora: lo conservo in lista, così non lo perdo.
+        if (current.AudioDeviceId.Length > 0 && AudioDevices.All(a => a.Id != current.AudioDeviceId))
+            AudioDevices.Add(new AudioDeviceItem(current.AudioDeviceId, current.AudioDeviceName, current.AudioDeviceName + " (non collegato)"));
+        SelectedAudioDevice = AudioDevices.FirstOrDefault(a => a.Id == current.AudioDeviceId) ?? AudioDevices[0];
+
         SimulationMode = current.SimulationMode;
         IsImageTappo = current.Tappo.Kind == TappoKind.Image;
         TappoPath = current.Tappo.Path;
@@ -83,6 +100,8 @@ public sealed partial class SettingsViewModel : ObservableObject
     }
 
     public ObservableCollection<MonitorItem> Monitors { get; } = [];
+
+    public ObservableCollection<AudioDeviceItem> AudioDevices { get; } = [];
 
     public bool IsVideoTappo
     {
@@ -126,6 +145,8 @@ public sealed partial class SettingsViewModel : ObservableObject
                 Kind = IsImageTappo ? TappoKind.Image : TappoKind.Video,
                 Path = TappoPath?.Trim() ?? ""
             },
+            AudioDeviceId = SelectedAudioDevice?.Id ?? "",
+            AudioDeviceName = SelectedAudioDevice?.Name ?? "",
             FadeDurationMs = (int)Math.Round(FadeDurationMs),
             HardCut = HardCut
         };

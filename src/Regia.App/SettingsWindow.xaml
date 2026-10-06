@@ -44,6 +44,12 @@
           <TextBox Text="{Binding TappoPath, UpdateSourceTrigger=PropertyChanged}" />
         </DockPanel>
 
+        <TextBlock Text="Uscita audio" FontSize="16" FontWeight="SemiBold" Margin="0,22,0,6" />
+        <ListBox ItemsSource="{Binding AudioDevices}" SelectedItem="{Binding SelectedAudioDevice}"
+                 DisplayMemberPath="Display" MinHeight="70" MaxHeight="150" />
+        <TextBlock Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,0"
+                   Text="Vale per i video. PowerPoint suona sempre sul dispositivo predefinito di Windows." />
+
         <TextBlock Text="Dissolvenza" FontSize="16" FontWeight="SemiBold" Margin="0,22,0,6" />
         <DockPanel>
           <TextBlock DockPanel.Dock="Right" Width="70" TextAlignment="Right" VerticalAlignment="Center"

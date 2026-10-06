@@ -30,6 +30,24 @@ public partial class ContentWindow : Window
             Host.Children.Remove(owner);
     }
 
+    /// <summary>
+    /// Toglie dal contenuto un elemento con una finestra nativa (HwndHost) il cui player sta ancora
+    /// fermandosi in background: resta nascosto e viene distrutto solo quando <paramref name="until"/> è completato.
+    /// </summary>
+    internal void Retire(UIElement element, Task until)
+    {
+        Host.Children.Remove(element);
+        Retired.Children.Add(element);
+
+        _ = until.ContinueWith(
+            _ => Dispatcher.BeginInvoke(() =>
+            {
+                Retired.Children.Remove(element);
+                (element as IDisposable)?.Dispose();
+            }),
+            TaskScheduler.Default);
+    }
+
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);

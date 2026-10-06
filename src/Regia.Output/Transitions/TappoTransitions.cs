@@ -17,6 +17,8 @@ public sealed class TappoTransitions : ITappoTransitions
     /// <summary>Impostazioni correnti: vanno aggiornate quando l'operatore le cambia.</summary>
     public AppSettings Settings { get; set; }
 
+    public TimeSpan FadeDuration => Settings.HardCut ? TimeSpan.Zero : TimeSpan.FromMilliseconds(Settings.FadeDurationMs);
+
     public Task<bool> RevealAsync() => _fader.FadeOutAsync(Settings.FadeDurationMs, Settings.HardCut);
 
     public Task<bool> CoverAsync() => _fader.FadeInAsync(Settings.FadeDurationMs, Settings.HardCut);

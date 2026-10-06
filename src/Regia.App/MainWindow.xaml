@@ -13,6 +13,7 @@
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
     <DockPanel Grid.Row="0" Margin="0,0,0,14">
@@ -69,6 +70,23 @@
       <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
         <Button Content="Aggiungi file..." Click="OnAddFilesClick" Padding="14,6" />
         <Button Content="Rimuovi" Command="{Binding RemoveSelectedCommand}" Padding="14,6" Margin="8,0,0,0" />
+        <StackPanel Orientation="Horizontal" Margin="24,0,0,0" VerticalAlignment="Center">
+          <StackPanel.Style>
+            <Style TargetType="StackPanel">
+              <Setter Property="Visibility" Value="Collapsed" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSelectedVideo}" Value="True">
+                  <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </StackPanel.Style>
+          <TextBlock Text="A fine video:" VerticalAlignment="Center" Margin="0,0,10,0" />
+          <RadioButton Content="Torna al Tappo" GroupName="VideoEnd" IsChecked="{Binding EndReturnToTappo}" />
+          <RadioButton Content="Fermo" GroupName="VideoEnd" IsChecked="{Binding EndHoldLastFrame}"
+                       ToolTip="Resta fermo sull'ultimo fotogramma" />
+          <RadioButton Content="Loop" GroupName="VideoEnd" IsChecked="{Binding EndLoop}" />
+        </StackPanel>
       </StackPanel>
       <ListBox ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
                DisplayMemberPath="DisplayName" FontSize="16" MinHeight="120" />
@@ -97,7 +115,42 @@
       <Button Grid.Column="2" Content="&#9654;" Command="{Binding NextPageCommand}" FontSize="22" />
     </Grid>
 
-    <Grid Grid.Row="5" Margin="0,0,0,14">
+    <!-- Video in onda: countdown, play/pausa, volume (il pannello Program completo arriva in M7) -->
+    <Border Grid.Row="5" Background="{StaticResource PanelBrush}" CornerRadius="8" Padding="14,10" Margin="0,0,0,14">
+      <Border.Style>
+        <Style TargetType="Border">
+          <Setter Property="Visibility" Value="Collapsed" />
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding IsVideoOnAir}" Value="True">
+              <Setter Property="Visibility" Value="Visible" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+      </Border.Style>
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <StackPanel Grid.Column="0" Margin="0,0,24,0">
+          <TextBlock Text="{Binding RemainingText}" FontSize="48" FontWeight="Bold" FontFamily="Consolas" />
+          <TextBlock Text="{Binding ElapsedText}" FontSize="14" Foreground="{StaticResource MutedBrush}" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+          <DockPanel>
+            <Button DockPanel.Dock="Left" Content="{Binding PauseButtonText}" Command="{Binding TogglePauseCommand}"
+                    Width="90" Padding="0,8" />
+            <CheckBox DockPanel.Dock="Right" Content="Mute" IsChecked="{Binding IsMuted}" VerticalAlignment="Center" Margin="12,0,0,0" />
+            <TextBlock DockPanel.Dock="Right" Width="40" TextAlignment="Right" VerticalAlignment="Center"
+                       Text="{Binding Volume, StringFormat={}{0}%}" />
+            <Slider Minimum="0" Maximum="100" Value="{Binding Volume}" SmallChange="5" LargeChange="10"
+                    VerticalAlignment="Center" Margin="14,0,8,0" Focusable="False" />
+          </DockPanel>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="6" Margin="0,0,0,14">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="14" />
@@ -112,7 +165,7 @@
       </Button>
     </Grid>
 
-    <Button Grid.Row="6" Command="{Binding PanicCommand}" Background="#FFB71C1C" Padding="14,26">
+    <Button Grid.Row="7" Command="{Binding PanicCommand}" Background="#FFB71C1C" Padding="14,26">
       <TextBlock Text="PANIC  (Esc)" FontSize="34" FontWeight="Bold" Foreground="White" />
     </Button>
   </Grid>

@@ -21,6 +21,9 @@ public enum WaveTrigger
     /// <summary>Cambio slide / pagina dentro il contenuto in onda.</summary>
     Navigate,
 
+    /// <summary>Play / Pausa del contenuto in onda (video).</summary>
+    Transport,
+
     /// <summary>PANIC: Tappo immediato.</summary>
     Panic,
 

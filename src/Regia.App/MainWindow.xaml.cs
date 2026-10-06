@@ -84,7 +84,7 @@ public partial class MainWindow : Window
         {
             Title = "Aggiungi file",
             Multiselect = true,
-            Filter = "Immagini e PDF|*.jpg;*.jpeg;*.png;*.pdf|Tutti i file|*.*"
+            Filter = "Immagini, PDF e video|*.jpg;*.jpeg;*.png;*.pdf;*.mp4;*.mov;*.mkv;*.avi;*.wmv;*.m4v|Tutti i file|*.*"
         };
 
         if (dialog.ShowDialog(this) == true)

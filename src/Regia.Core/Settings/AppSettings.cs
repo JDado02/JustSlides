@@ -31,6 +31,12 @@ public sealed record AppSettings
 
     public int FadeDurationMs { get; init; } = 500;
 
+    /// <summary>ID endpoint CoreAudio del dispositivo di uscita audio dell'evento; vuoto = predefinito di Windows.</summary>
+    public string AudioDeviceId { get; init; } = "";
+
+    /// <summary>Nome del dispositivo scelto, per avvisare l'operatore se non è più collegato.</summary>
+    public string AudioDeviceName { get; init; } = "";
+
     /// <summary>Taglio secco invece della dissolvenza.</summary>
     public bool HardCut { get; init; }
 

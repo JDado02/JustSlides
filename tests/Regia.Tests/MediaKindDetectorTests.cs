@@ -19,4 +19,20 @@ public class MediaKindDetectorTests
     {
         Assert.Equal(expected, MediaKindDetector.FromPath(path));
     }
+
+    [Fact]
+    public void Video_DefaultEnd_IsReturnToTappo()
+    {
+        Assert.Equal(VideoEndAction.ReturnToTappo, MediaItem.FromPath("clip.mp4").VideoEnd);
+    }
+
+    [Fact]
+    public void Video_EndAction_IsPartOfItemIdentity()
+    {
+        var a = MediaItem.FromPath("clip.mp4");
+        var b = a with { VideoEnd = VideoEndAction.Loop };
+
+        Assert.NotEqual(a, b);
+        Assert.Equal(a.Path, b.Path);
+    }
 }

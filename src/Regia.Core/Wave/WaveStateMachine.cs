@@ -63,6 +63,7 @@ public sealed class WaveStateMachine
         t[(WaveState.InOnda, WaveTrigger.Stop)] = WaveState.InTransizioneOut;
         t[(WaveState.InOnda, WaveTrigger.Go)] = WaveState.InTransizioneOut; // cambio file via Tappo
         t[(WaveState.InOnda, WaveTrigger.Navigate)] = WaveState.InOnda;
+        t[(WaveState.InOnda, WaveTrigger.Transport)] = WaveState.InOnda;
 
         t[(WaveState.InTransizioneOut, WaveTrigger.FadeCompleted)] = WaveState.Tappo;
 
