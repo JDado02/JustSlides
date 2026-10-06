@@ -4,8 +4,8 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 
 ## Stato
 - **M1 Base e Tappo: COMPLETATA** e testata a mano dall'utente ("funziona tutto"). Commit `3efbf4c`.
-- **M2 Macchina a stati + immagini e PDF: IMPLEMENTATA**, build 0 avvisi, 96 test xUnit verdi. In attesa del test manuale dell'utente (immagini e PDF reali mai provati: nessuno schermo/file di prova per Claude).
-- Prossima: **M3 Video**, solo dopo conferma dei test di M2 e piano approvato.
+- **M2 Macchina a stati + immagini e PDF: COMPLETATA** e testata a mano dall'utente ("funziona tutto"). Build 0 avvisi, 96 test xUnit verdi. Commit `efdfc2c`.
+- Prossima: **M3 Video**. Non iniziata: serve prima il piano approvato.
 
 ## Ambiente
 - .NET SDK 10.0.401, PowerPoint 16 (M365, x64), git 2.53. Identità git impostata solo nel repo (Davide / chatbotdt@gmail.com).
@@ -61,9 +61,5 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - Audio del Tappo video: muto per scelta; opzione nelle impostazioni solo se l'utente la chiede.
 - La CPU del Tappo video a pieno schermo non è stata misurata con precisione (obiettivo < 10%).
 
-## Da verificare a mano in M2 (non provato da Claude)
-- `Windows.Data.Pdf` in app non pacchettizzata con PDF reali (se non carica: alternativa PDFium, da concordare).
-- Immagini e PDF reali sul monitor di output, PANIC durante caricamento/dissolvenza, GO su altro file mentre uno è in onda.
-
 ## Prossimo passo
-Attendere l'esito dei test manuali di M2; poi **piano di M3 (Video)**.
+Leggere CLAUDE.md e questo file, poi **proporre il piano di M3 (Video)** e attendere l'approvazione prima di scrivere codice.
