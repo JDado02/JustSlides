@@ -20,6 +20,7 @@ public sealed class WaveController
     private int _generation;
     private bool _endPending;
     private bool _muted;
+    private int _liveVolume = 100;
 
     public WaveController(WaveStateMachine machine, ITappoTransitions tappo, IContentPresenterFactory factory)
     {
@@ -39,6 +40,12 @@ public sealed class WaveController
     public PlaybackProgress? Progress => _playback?.Progress;
 
     public bool IsPaused => _playback?.IsPaused ?? false;
+
+    /// <summary>
+    /// Volume dal vivo del video in onda (0-100). Parte dal volume salvato nel file (<see cref="MediaItem.Volume"/>)
+    /// a ogni messa in onda e si può cambiare senza toccare quello salvato.
+    /// </summary>
+    public int LiveVolume => _liveVolume;
 
     public event Action<WaveState, WaveState>? StateChanged;
 
@@ -135,14 +142,14 @@ public sealed class WaveController
         }
     }
 
-    /// <summary>Volume 0-100 del video in onda; si ricorda nel file (<see cref="MediaItem.Volume"/>) per le volte successive.</summary>
+    /// <summary>Volume dal vivo 0-100 del video in onda. Non cambia il volume salvato nel file: solo questa riproduzione.</summary>
     public void SetVolume(int volume)
     {
-        volume = Math.Clamp(volume, 0, 100);
-        if (CurrentItem is { Kind: MediaKind.Video } item)
-            item.Volume = volume;
+        if (_playback is null)
+            return;
 
-        TryApply(p => p.SetVolume(volume), "Volume");
+        _liveVolume = Math.Clamp(volume, 0, 100);
+        TryApply(p => p.SetVolume(_liveVolume), "Volume");
     }
 
     /// <summary>Porta il video in onda a una posizione assoluta. Ignorato fuori da <c>InOnda</c> (anche durante le dissolvenze).</summary>
@@ -249,9 +256,11 @@ public sealed class WaveController
             playback.ProgressChanged += OnPlaybackProgress;
             playback.EndRequested += OnPlaybackEnded;
             playback.Faulted += OnPlaybackFaulted;
+            // Ogni video parte dal suo volume salvato.
+            _liveVolume = Math.Clamp(item.Volume, 0, 100);
             TryApply(p =>
             {
-                p.SetVolume(item.Volume); // ogni video ha il suo volume
+                p.SetVolume(_liveVolume);
                 p.SetMuted(_muted);
             }, "Volume iniziale");
         }

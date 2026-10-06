@@ -442,38 +442,40 @@ public class WaveControllerTests
     }
 
     [Fact]
-    public async Task SetVolume_OnAir_IsRememberedOnTheItem()
+    public async Task SetVolume_OnAir_ChangesOnlyLiveVolume_NotTheSavedOne()
     {
         var (c, _, f) = Create();
-        var item = new MediaItem("v.mp4", MediaKind.Video);
+        var item = new MediaItem("v.mp4", MediaKind.Video) { Volume = 80 };
         await c.GoAsync(item);
+        Assert.Equal(80, c.LiveVolume); // parte dal volume salvato
 
         c.SetVolume(40);
         Assert.Equal(40, f.Videos["v.mp4"].Volume);
-        Assert.Equal(40, item.Volume);
+        Assert.Equal(40, c.LiveVolume);
+        Assert.Equal(80, item.Volume); // il salvato non cambia
 
         c.SetVolume(250); // oltre il limite: si riporta a 100
         Assert.Equal(100, f.Videos["v.mp4"].Volume);
-        Assert.Equal(100, item.Volume);
+        Assert.Equal(80, item.Volume);
 
-        // La volta dopo parte da quel volume.
-        c.SetVolume(55);
+        // La volta dopo si riparte dal volume salvato, non da quello dal vivo.
         await c.StopAsync();
         await c.GoAsync(item);
-        Assert.Equal(55, f.Videos["v.mp4"].Volume);
+        Assert.Equal(80, f.Videos["v.mp4"].Volume);
+        Assert.Equal(80, c.LiveVolume);
     }
 
     [Fact]
     public async Task SetVolume_WithNothingOnAir_ChangesNothing()
     {
-        var (c, _, _) = Create();
+        var (c, _, f) = Create();
         var item = new MediaItem("v.mp4", MediaKind.Video) { Volume = 70 };
 
         c.SetVolume(10);
 
         Assert.Equal(70, item.Volume);
         await c.GoAsync(item);
-        Assert.Equal(70, item.Volume);
+        Assert.Equal(70, f.Videos["v.mp4"].Volume);
     }
 
     [Fact]

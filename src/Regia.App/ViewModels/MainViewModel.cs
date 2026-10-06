@@ -29,6 +29,7 @@ public sealed partial class MainViewModel : ObservableObject
     private bool _isScrubbing;
     private bool _syncingPosition;
     private bool _syncingVolume;
+    private MediaItem? _liveItem;
     private long _lastSeekTick;
 
     [ObservableProperty]
@@ -126,10 +127,11 @@ public sealed partial class MainViewModel : ObservableObject
             if (item.Volume == value)
                 return;
 
+            item.Volume = value;
+
+            // Se è proprio il video in onda, lo si sente subito (anche sul cursore dal vivo).
             if (ReferenceEquals(item, _wave.CurrentItem))
-                Volume = value; // è in onda: si applica dal vivo (e il controller lo ricorda nel file)
-            else
-                item.Volume = value;
+                Volume = value;
 
             OnPropertyChanged();
         }
@@ -234,15 +236,24 @@ public sealed partial class MainViewModel : ObservableObject
         if (_syncingVolume)
             return;
 
-        _wave.SetVolume(value);
-        OnPropertyChanged(nameof(SelectedVolume));
+        _wave.SetVolume(value); // solo dal vivo: il volume salvato nel file non cambia
     }
 
-    /// <summary>Spostamento del cursore di posizione da parte dell'utente (con limite di frequenza per non intasare VLC).</summary>
+    /// <summary>
+    /// Spostamento del cursore di posizione da parte dell'utente. Gli aggiornamenti automatici passano da
+    /// <c>_syncingPosition</c>, quindi tutto il resto viene da una persona (mouse, tocco, accessibilità).
+    /// Durante il trascinamento si limita la frequenza per non intasare VLC; la posizione finale la manda <see cref="EndScrub"/>.
+    /// </summary>
     partial void OnPositionSecondsChanged(double value)
     {
-        if (_syncingPosition || !_isScrubbing)
+        if (_syncingPosition)
             return;
+
+        if (!_isScrubbing)
+        {
+            _wave.SeekTo(TimeSpan.FromSeconds(value));
+            return;
+        }
 
         var now = Environment.TickCount64;
         if (now - _lastSeekTick < 80)
@@ -315,14 +326,18 @@ public sealed partial class MainViewModel : ObservableObject
                 _syncingPosition = false;
             }
 
-            // Al video che va in onda si mostra il suo volume.
-            if (_wave.CurrentItem is { Kind: MediaKind.Video } current && Volume != current.Volume)
+            // Quando un video va in onda il cursore dal vivo riparte dal suo volume salvato.
+            if (!ReferenceEquals(_liveItem, _wave.CurrentItem))
             {
+                _liveItem = _wave.CurrentItem;
                 _syncingVolume = true;
-                Volume = current.Volume;
+                Volume = _wave.LiveVolume;
                 _syncingVolume = false;
-                OnPropertyChanged(nameof(SelectedVolume));
             }
+        }
+        else
+        {
+            _liveItem = null;
         }
 
         OnPropertyChanged(nameof(IsVideoOnAir));

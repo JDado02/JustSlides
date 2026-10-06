@@ -147,7 +147,6 @@ public sealed class OutputHost : IDisposable
 
         EnsureHandles();
         WindowPlacement.SetOwner(Content, _simulation);
-        WindowPlacement.SetOwner(Tappo, _simulation);
         ShowWindows();
         LayoutSimulation();
 
@@ -175,7 +174,6 @@ public sealed class OutputHost : IDisposable
 
         _simulation.ViewportChanged -= LayoutSimulation;
         WindowPlacement.SetOwner(Content, null);
-        WindowPlacement.SetOwner(Tappo, null);
         _simulation.CloseForReal();
         _simulation = null;
     }
@@ -184,6 +182,11 @@ public sealed class OutputHost : IDisposable
     {
         WindowPlacement.GetHandle(Content);
         WindowPlacement.GetHandle(Tappo);
+
+        // Il Tappo è posseduto dal contenuto: Windows tiene sempre una finestra posseduta SOPRA il suo
+        // proprietario, comunque si clicchi o si attivi qualcosa. Senza questo, un clic sul video (col Tappo
+        // trasparente e click-through) portava il contenuto sopra il Tappo: al ritorno al Tappo restava lo schermo nero.
+        WindowPlacement.SetOwner(Tappo, Content);
     }
 
     private void ShowWindows()

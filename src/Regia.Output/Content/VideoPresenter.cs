@@ -112,6 +112,10 @@ public sealed class VideoPresenter : IPlaybackContent
             return;
 
         _player = new MediaPlayer(_vlc.Instance) { Hwnd = _host.Handle };
+
+        // I clic e i tasti non vanno a VLC: la regia li gestisce da sé (e un clic sul video non deve spostare finestre).
+        _player.EnableMouseInput = false;
+        _player.EnableKeyInput = false;
         if (_audioDeviceId is not null)
             _player.SetAudioOutput("mmdevice");
 
