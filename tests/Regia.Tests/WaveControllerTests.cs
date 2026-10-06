@@ -36,6 +36,8 @@ public class WaveControllerTests
         public int Volume { get; private set; } = -1;
         public bool Muted { get; private set; }
         public Exception? LoadError { get; set; }
+        public Exception? SeekError { get; set; }
+        public List<TimeSpan> Seeks { get; } = [];
         public List<TimeSpan> Fades { get; } = [];
         public PlaybackProgress Progress { get; set; } = new(TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(10));
         public PageInfo? Page => null;
@@ -65,6 +67,13 @@ public class WaveControllerTests
         public void SetVolume(int volume) => Volume = volume;
 
         public void SetMuted(bool muted) => Muted = muted;
+
+        public void Seek(TimeSpan position)
+        {
+            if (SeekError is not null)
+                throw SeekError;
+            Seeks.Add(position);
+        }
 
         public Task FadeAudioOutAsync(TimeSpan duration)
         {
@@ -419,19 +428,133 @@ public class WaveControllerTests
     }
 
     [Fact]
-    public async Task VolumeAndMute_AreAppliedToNextVideo()
+    public async Task Video_StartsWithItsOwnVolume()
     {
         var (c, _, f) = Create();
+        var quiet = new MediaItem("quiet.mp4", MediaKind.Video) { Volume = 30 };
+        var loud = new MediaItem("loud.mp4", MediaKind.Video) { Volume = 90 };
+
+        await c.GoAsync(quiet);
+        await c.GoAsync(loud);
+
+        Assert.Equal(30, f.Videos["quiet.mp4"].Volume);
+        Assert.Equal(90, f.Videos["loud.mp4"].Volume);
+    }
+
+    [Fact]
+    public async Task SetVolume_OnAir_IsRememberedOnTheItem()
+    {
+        var (c, _, f) = Create();
+        var item = new MediaItem("v.mp4", MediaKind.Video);
+        await c.GoAsync(item);
+
         c.SetVolume(40);
+        Assert.Equal(40, f.Videos["v.mp4"].Volume);
+        Assert.Equal(40, item.Volume);
+
+        c.SetVolume(250); // oltre il limite: si riporta a 100
+        Assert.Equal(100, f.Videos["v.mp4"].Volume);
+        Assert.Equal(100, item.Volume);
+
+        // La volta dopo parte da quel volume.
+        c.SetVolume(55);
+        await c.StopAsync();
+        await c.GoAsync(item);
+        Assert.Equal(55, f.Videos["v.mp4"].Volume);
+    }
+
+    [Fact]
+    public async Task SetVolume_WithNothingOnAir_ChangesNothing()
+    {
+        var (c, _, _) = Create();
+        var item = new MediaItem("v.mp4", MediaKind.Video) { Volume = 70 };
+
+        c.SetVolume(10);
+
+        Assert.Equal(70, item.Volume);
+        await c.GoAsync(item);
+        Assert.Equal(70, item.Volume);
+    }
+
+    [Fact]
+    public async Task Mute_IsAppliedToNextVideo()
+    {
+        var (c, _, f) = Create();
         c.SetMuted(true);
 
         await c.GoAsync(V);
 
-        Assert.Equal(40, f.Videos["v.mp4"].Volume);
         Assert.True(f.Videos["v.mp4"].Muted);
+    }
 
-        c.SetVolume(250); // oltre il limite: si riporta a 100
-        Assert.Equal(100, f.Videos["v.mp4"].Volume);
+    [Fact]
+    public async Task SeekTo_OnAir_IsForwardedAndNotifies()
+    {
+        var (c, _, f) = Create();
+        await c.GoAsync(V);
+        var notified = 0;
+        c.PlaybackChanged += () => notified++;
+
+        Assert.True(c.SeekTo(TimeSpan.FromSeconds(42)));
+
+        Assert.Equal([TimeSpan.FromSeconds(42)], f.Videos["v.mp4"].Seeks);
+        Assert.Equal(1, notified);
+    }
+
+    [Fact]
+    public async Task SeekTo_WhilePaused_IsAllowed()
+    {
+        var (c, _, f) = Create();
+        await c.GoAsync(V);
+        c.TogglePause();
+
+        Assert.True(c.SeekTo(TimeSpan.FromSeconds(5)));
+        Assert.Single(f.Videos["v.mp4"].Seeks);
+        Assert.True(c.IsPaused);
+    }
+
+    [Fact]
+    public async Task SeekBy_IsRelativeToCurrentPosition()
+    {
+        var (c, _, f) = Create(); // il finto è a 3 s su 10 s
+        await c.GoAsync(V);
+
+        c.SeekBy(TimeSpan.FromSeconds(10));
+        c.SeekBy(TimeSpan.FromSeconds(-10));
+
+        Assert.Equal([TimeSpan.FromSeconds(13), TimeSpan.FromSeconds(-7)], f.Videos["v.mp4"].Seeks);
+    }
+
+    [Fact]
+    public async Task SeekTo_IgnoredWhenNotOnAirVideo()
+    {
+        var (c, t, f) = Create();
+        Assert.False(c.SeekTo(TimeSpan.FromSeconds(1))); // Tappo
+
+        await c.GoAsync(A);
+        Assert.False(c.SeekTo(TimeSpan.FromSeconds(1))); // immagine
+
+        t.RevealGate = new TaskCompletionSource<bool>();
+        var go = c.GoAsync(V);
+        Assert.False(c.SeekTo(TimeSpan.FromSeconds(1))); // durante la dissolvenza in entrata
+        Assert.Empty(f.Videos["v.mp4"].Seeks);
+
+        t.RevealGate.SetResult(true);
+        await go;
+    }
+
+    [Fact]
+    public async Task SeekTo_Exception_GoesToErrore()
+    {
+        var (c, t, f) = Create();
+        await c.GoAsync(V);
+        f.Videos["v.mp4"].SeekError = new InvalidOperationException("seek impossibile");
+
+        Assert.False(c.SeekTo(TimeSpan.FromSeconds(1)));
+
+        Assert.Equal(WaveState.Errore, c.State);
+        Assert.Contains("coverNow", t.Calls);
+        Assert.Equal(1, f.Videos["v.mp4"].CloseCount);
     }
 
     [Fact]

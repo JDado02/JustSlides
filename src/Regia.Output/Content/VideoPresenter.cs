@@ -183,6 +183,32 @@ public sealed class VideoPresenter : IPlaybackContent
         ApplyVolume();
     }
 
+    public void Seek(TimeSpan position)
+    {
+        var player = _player;
+        if (_closed || player is null || !_started)
+            return;
+
+        var length = GetLengthMs(player);
+        if (length <= 0)
+            return; // durata sconosciuta: non scorrevole
+
+        // Mai oltre il margine di fine: altrimenti il polling lo prenderebbe per un video finito.
+        var target = (long)Math.Clamp(position.TotalMilliseconds, 0, Math.Max(0, length - 2 * EndMarginMs));
+
+        if (_ended)
+        {
+            // Era arrivato in fondo (fermo sull'ultimo fotogramma): si riapre lo scorrimento, restando in pausa.
+            _ended = false;
+            _userPaused = true;
+            if (player.State is VLCState.Ended or VLCState.Stopped)
+                player.Play();
+        }
+
+        player.Time = target;
+        ProgressChanged?.Invoke();
+    }
+
     public Task FadeAudioOutAsync(TimeSpan duration)
     {
         if (_closed || _player is null)

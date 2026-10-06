@@ -26,6 +26,10 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly WaveController _wave;
     private readonly TappoTransitions _transitions;
     private readonly ContentPresenterFactory _factory;
+    private bool _isScrubbing;
+    private bool _syncingPosition;
+    private bool _syncingVolume;
+    private long _lastSeekTick;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StateText))]
@@ -40,10 +44,19 @@ public sealed partial class MainViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(EndReturnToTappo))]
     [NotifyPropertyChangedFor(nameof(EndHoldLastFrame))]
     [NotifyPropertyChangedFor(nameof(EndLoop))]
+    [NotifyPropertyChangedFor(nameof(SelectedVolume))]
     private MediaItem? _selectedItem;
 
+    /// <summary>Volume del video in onda (cursore del pannello video).</summary>
     [ObservableProperty]
     private int _volume = 100;
+
+    /// <summary>Posizione del video in onda in secondi (cursore di scorrimento).</summary>
+    [ObservableProperty]
+    private double _positionSeconds;
+
+    [ObservableProperty]
+    private double _durationSeconds;
 
     [ObservableProperty]
     private bool _isMuted;
@@ -87,6 +100,9 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>C'è un video in onda (o in entrata): si mostrano countdown e comandi di riproduzione.</summary>
     public bool IsVideoOnAir => _wave.Progress is not null;
 
+    /// <summary>Salto dei pulsanti "indietro / avanti" del video.</summary>
+    public const double SeekStepSeconds = 10;
+
     /// <summary>Countdown "tempo rimanente" del video in onda.</summary>
     public string RemainingText => _wave.Progress is { } p ? "-" + FormatTime(p.Remaining) : "";
 
@@ -96,6 +112,28 @@ public sealed partial class MainViewModel : ObservableObject
     public string PauseButtonText => _wave.IsPaused ? "PLAY" : "PAUSA";
 
     public bool IsSelectedVideo => SelectedItem?.Kind == MediaKind.Video;
+
+    /// <summary>Volume del video selezionato, ricordato per ogni file; impostabile anche prima del GO.</summary>
+    public int SelectedVolume
+    {
+        get => SelectedItem?.Volume ?? 100;
+        set
+        {
+            if (SelectedItem is not { Kind: MediaKind.Video } item)
+                return;
+
+            value = Math.Clamp(value, 0, 100);
+            if (item.Volume == value)
+                return;
+
+            if (ReferenceEquals(item, _wave.CurrentItem))
+                Volume = value; // è in onda: si applica dal vivo (e il controller lo ricorda nel file)
+            else
+                item.Volume = value;
+
+            OnPropertyChanged();
+        }
+    }
 
     public bool EndReturnToTappo
     {
@@ -191,7 +229,47 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void TogglePause() => _wave.TogglePause();
 
-    partial void OnVolumeChanged(int value) => _wave.SetVolume(value);
+    partial void OnVolumeChanged(int value)
+    {
+        if (_syncingVolume)
+            return;
+
+        _wave.SetVolume(value);
+        OnPropertyChanged(nameof(SelectedVolume));
+    }
+
+    /// <summary>Spostamento del cursore di posizione da parte dell'utente (con limite di frequenza per non intasare VLC).</summary>
+    partial void OnPositionSecondsChanged(double value)
+    {
+        if (_syncingPosition || !_isScrubbing)
+            return;
+
+        var now = Environment.TickCount64;
+        if (now - _lastSeekTick < 80)
+            return;
+
+        _lastSeekTick = now;
+        _wave.SeekTo(TimeSpan.FromSeconds(value), log: false);
+    }
+
+    /// <summary>L'utente ha afferrato il cursore: da qui in poi la posizione non si aggiorna da sola.</summary>
+    public void BeginScrub() => _isScrubbing = true;
+
+    /// <summary>Cursore rilasciato: posizione definitiva.</summary>
+    public void EndScrub()
+    {
+        if (!_isScrubbing)
+            return;
+
+        _isScrubbing = false;
+        _wave.SeekTo(TimeSpan.FromSeconds(PositionSeconds));
+    }
+
+    [RelayCommand]
+    private void SeekBack() => _wave.SeekBy(TimeSpan.FromSeconds(-SeekStepSeconds));
+
+    [RelayCommand]
+    private void SeekForward() => _wave.SeekBy(TimeSpan.FromSeconds(SeekStepSeconds));
 
     partial void OnIsMutedChanged(bool value) => _wave.SetMuted(value);
 
@@ -222,6 +300,31 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void OnPlaybackChanged()
     {
+        // Rete di sicurezza: se il rilascio del mouse sul cursore è andato perso, si riprende ad aggiornare la posizione.
+        if (_isScrubbing && System.Windows.Input.Mouse.LeftButton == System.Windows.Input.MouseButtonState.Released)
+            EndScrub();
+
+        if (_wave.Progress is { } progress)
+        {
+            // Durata prima della posizione: il cursore ha il massimo = durata.
+            if (!_isScrubbing)
+            {
+                _syncingPosition = true;
+                DurationSeconds = progress.Duration.TotalSeconds;
+                PositionSeconds = progress.Elapsed.TotalSeconds;
+                _syncingPosition = false;
+            }
+
+            // Al video che va in onda si mostra il suo volume.
+            if (_wave.CurrentItem is { Kind: MediaKind.Video } current && Volume != current.Volume)
+            {
+                _syncingVolume = true;
+                Volume = current.Volume;
+                _syncingVolume = false;
+                OnPropertyChanged(nameof(SelectedVolume));
+            }
+        }
+
         OnPropertyChanged(nameof(IsVideoOnAir));
         OnPropertyChanged(nameof(RemainingText));
         OnPropertyChanged(nameof(ElapsedText));

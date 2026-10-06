@@ -5,8 +5,8 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 ## Stato
 - **M1 Base e Tappo: COMPLETATA** e testata a mano dall'utente ("funziona tutto"). Commit `3efbf4c`.
 - **M2 Macchina a stati + immagini e PDF: COMPLETATA** e testata a mano dall'utente ("funziona tutto"). Build 0 avvisi, 96 test xUnit verdi. Commit `efdfc2c`.
-- **M3 Video: IMPLEMENTATA, in attesa del test manuale dell'utente** (checklist data a fine milestone). Build 0 avvisi, 123 test xUnit verdi. Non provata con un video reale sul monitor di output (solo avvio dell'app verificato).
-- Prossima: **M4 PptHost**. Non iniziare finché l'utente non conferma i test di M3 e approva il piano.
+- **M3 Video: COMPLETATA** e testata a mano dall'utente ("funziona tutto"). Commit `0d1fcb6`. Rifinitura successiva richiesta dall'utente (volume per video + scorrimento), vedi "Decisioni prese in M3". Build 0 avvisi, 131 test xUnit verdi.
+- Prossima: **M4 PptHost**. Non iniziare finché l'utente non approva il piano.
 
 ## Ambiente
 - .NET SDK 10.0.401, PowerPoint 16 (M365, x64), git 2.53. Identità git impostata solo nel repo (Davide / chatbotdt@gmail.com).
@@ -50,11 +50,14 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - **Fade audio** = rampa del volume VLC (timer 30 ms) in parallelo a `CoverAsync`, durata = `ITappoTransitions.FadeDuration` (zero con taglio secco). PANIC: nessun fade, volume a 0 e chiusura.
 - **Chiusura sicura**: `Close()` azzera il volume, fa Stop/Dispose del player in `Task.Run`; la finestra video passa a `ContentWindow.Retire()` (griglia `Retired`, nascosta) e viene distrutta solo a Stop finito.
 - **Dispositivo audio**: `AppSettings.AudioDeviceId/Name` (ID endpoint CoreAudio, vuoto = predefinito Windows). `SetAudioOutput("mmdevice")` prima del Play, `SetOutputDevice(id)` dopo `Playing`. Dispositivo non più collegato -> predefinito + avviso arancione (`ContentPresenterFactory.Warning`). Lista nelle impostazioni = ListBox (nessun tema per ComboBox in `Dark.xaml`: non usarne senza stilizzarlo).
-- Volume/Mute: stato nel `WaveController` (`SetVolume`/`SetMuted`), riapplicato a ogni video; nuovo trigger `Transport` (Play/Pausa) valido solo in `InOnda`.
+- **Volume per singolo video** (richiesta dell'utente dopo il test): `MediaItem.Volume` (0-100, default 100) è l'unica proprietà *mutabile* del record, di proposito: la voce in lista e quella in onda restano la stessa istanza (`RemoveSelected`/`SetVideoEnd` usano `ReferenceEquals` con `WaveController.CurrentItem`). Il controller applica `item.Volume` a ogni GO; `WaveController.SetVolume` agisce sul video in onda **e** scrive il valore nell'item (ricordato per le volte dopo); con niente in onda non fa nulla. Nella lista c'è lo slider "Volume del video" (`SelectedVolume`, vale prima del GO; se il file è in onda si applica dal vivo); nel pannello video lo slider dal vivo (`Volume`). I due restano sincronizzati. Il **Mute resta globale** (non per video). Il volume sopravvive solo in sessione: la lista non si salva fino a M6 (file show), poi `Volume` va serializzato insieme a `VideoEnd`.
+- **Scorrimento video** (richiesta dell'utente): `IPlaybackContent.Seek`, `WaveController.SeekTo/SeekBy`, valido solo in `InOnda` (come Play/Pausa, trigger `Transport`), quindi anche in pausa; ignorato durante le dissolvenze. UI: cursore di posizione (trascinabile, seek dal vivo ogni ≥80 ms + posizione definitiva al rilascio) e pulsanti ±10 s (`MainViewModel.SeekStepSeconds`). Mentre il cursore è afferrato la posizione non si aggiorna da sola (`BeginScrub/EndScrub`, rete di sicurezza se il rilascio del mouse si perde). `VideoPresenter.Seek` non va mai oltre `durata - 2*EndMarginMs`; se il video era finito e fermo (HoldLastFrame) lo scorrimento lo riapre restando in pausa. Le frecce della tastiera NON scorrono il video (restano pagina/slide).
+- Volume/Mute: stato Mute nel `WaveController` (`SetMuted`), riapplicato a ogni video; nuovo trigger `Transport` (Play/Pausa e scorrimento) valido solo in `InOnda`.
 - NuGet aggiunto: `NAudio.Wasapi` 2.4.0 (la 3.x è una ristrutturazione, non usata).
 - UI provvisoria di M3: pannello video in `MainWindow` (countdown, trascorso/durata, Play/Pausa, volume, Mute) e scelta "A fine video" (RadioButton) per il file selezionato; il pannello Program vero è M7.
 
 ## Da verificare a mano in M3 (non provabile da me)
+- (Fatto dall'utente per la prima parte di M3: R1/R2/R3 ok.) Da provare: scorrimento in pausa (il fotogramma si aggiorna?), scorrimento verso la fine, volume per video.
 - R1: l'ultimo fotogramma resta davvero visibile (non nero) con "Torna al Tappo" e "Fermo".
 - R2/R3: volume 0 durante il caricamento (nessun suono sotto il Tappo) e uscita sul dispositivo scelto.
 - CPU/GPU con video 4K/HEVC a pieno schermo.
@@ -68,6 +71,7 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - `winget` nel contesto `!` non può rispondere a prompt: servono `--source winget --accept-package-agreements --accept-source-agreements`.
 - Versioni NuGet: `dotnet package search` dà le più vecchie; usare l'indice `api.nuget.org/v3-flatcontainer`.
 - `Dispatcher.Yield` è statico (`await Dispatcher.Yield(...)`); `MediaPlayer.SetOutputDevice` in LibVLCSharp 3.10 restituisce `void`.
+- Se la regia è aperta, `dotnet build` della soluzione fallisce con file bloccati (MSB3021): chiudere la regia, oppure verificare solo la compilazione con `dotnet build src\Regia.App\Regia.App.csproj -p:OutDir=<cartella temporanea>\`.
 - Negli script Python di patch su file del repo aprire con `newline=''` (i file in working copy sono LF, git li converte in CRLF).
 
 ## Rischi della specifica già discussi (non ancora implementati)

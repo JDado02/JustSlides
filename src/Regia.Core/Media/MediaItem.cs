@@ -29,6 +29,12 @@ public sealed record MediaItem(string Path, MediaKind Kind)
     /// <summary>Fine video (vale solo per i video).</summary>
     public VideoEndAction VideoEnd { get; init; } = VideoEndAction.ReturnToTappo;
 
+    /// <summary>
+    /// Volume del video, 0-100, ricordato per ogni file. Modificabile (anche mentre il video è in onda) e
+    /// volutamente non <c>init</c>: la voce della lista resta la stessa istanza di quella in onda.
+    /// </summary>
+    public int Volume { get; set; } = 100;
+
     public string DisplayName => Kind == MediaKind.TestPattern ? "Schermata di prova" : System.IO.Path.GetFileName(Path);
 
     public static MediaItem FromPath(string path) => new(path, MediaKindDetector.FromPath(path));

@@ -68,6 +68,9 @@ public interface IPlaybackContent : IContentPresenter
 
     void SetMuted(bool muted);
 
+    /// <summary>Porta la riproduzione a <paramref name="position"/> (anche in pausa); fuori dai limiti si riporta dentro.</summary>
+    void Seek(TimeSpan position);
+
     /// <summary>Abbassa l'audio a zero in <paramref name="duration"/>; completa a fine rampa o alla chiusura.</summary>
     Task FadeAudioOutAsync(TimeSpan duration);
 

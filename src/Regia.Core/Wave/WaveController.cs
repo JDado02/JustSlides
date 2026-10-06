@@ -19,7 +19,6 @@ public sealed class WaveController
     private CancellationTokenSource _cts = new();
     private int _generation;
     private bool _endPending;
-    private int _volume = 100;
     private bool _muted;
 
     public WaveController(WaveStateMachine machine, ITappoTransitions tappo, IContentPresenterFactory factory)
@@ -136,12 +135,43 @@ public sealed class WaveController
         }
     }
 
-    /// <summary>Volume 0-100 del contenuto in onda; vale anche per i video successivi.</summary>
+    /// <summary>Volume 0-100 del video in onda; si ricorda nel file (<see cref="MediaItem.Volume"/>) per le volte successive.</summary>
     public void SetVolume(int volume)
     {
-        _volume = Math.Clamp(volume, 0, 100);
-        TryApply(p => p.SetVolume(_volume), "Volume");
+        volume = Math.Clamp(volume, 0, 100);
+        if (CurrentItem is { Kind: MediaKind.Video } item)
+            item.Volume = volume;
+
+        TryApply(p => p.SetVolume(volume), "Volume");
     }
+
+    /// <summary>Porta il video in onda a una posizione assoluta. Ignorato fuori da <c>InOnda</c> (anche durante le dissolvenze).</summary>
+    public bool SeekTo(TimeSpan position, bool log = true)
+    {
+        if (_playback is null || !_machine.CanFire(WaveTrigger.Transport))
+        {
+            Log.Warning("Scorrimento video ignorato: stato {State}", _machine.State);
+            return false;
+        }
+
+        try
+        {
+            _playback.Seek(position);
+            if (log)
+                Log.Information("Video: posizione {Position:hh\\:mm\\:ss}", position);
+            PlaybackChanged?.Invoke();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Fail("Scorrimento video", ex);
+            return false;
+        }
+    }
+
+    /// <summary>Sposta il video in onda avanti o indietro rispetto alla posizione attuale.</summary>
+    public bool SeekBy(TimeSpan delta) =>
+        SeekTo(_playback is { } playback ? playback.Progress.Elapsed + delta : delta);
 
     public void SetMuted(bool muted)
     {
@@ -221,7 +251,7 @@ public sealed class WaveController
             playback.Faulted += OnPlaybackFaulted;
             TryApply(p =>
             {
-                p.SetVolume(_volume);
+                p.SetVolume(item.Volume); // ogni video ha il suo volume
                 p.SetMuted(_muted);
             }, "Volume iniziale");
         }

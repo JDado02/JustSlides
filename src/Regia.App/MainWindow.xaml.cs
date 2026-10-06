@@ -91,6 +91,11 @@ public partial class MainWindow : Window
             _viewModel.AddFiles(dialog.FileNames);
     }
 
+    // Cursore di scorrimento del video: finché è afferrato la posizione non si aggiorna da sola.
+    private void OnScrubStart(object sender, RoutedEventArgs e) => _viewModel.BeginScrub();
+
+    private void OnScrubEnd(object sender, RoutedEventArgs e) => _viewModel.EndScrub();
+
     private void OnSettingsClick(object sender, RoutedEventArgs e)
     {
         var window = new SettingsWindow(_viewModel.CreateSettingsViewModel()) { Owner = this };
