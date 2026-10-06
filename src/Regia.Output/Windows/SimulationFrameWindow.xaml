@@ -1,0 +1,8 @@
+<Window x:Class="Regia.Output.Windows.SimulationFrameWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Regia - Simulazione Output"
+        Width="960" Height="580" MinWidth="320" MinHeight="200"
+        Background="#FF101010" WindowStartupLocation="Manual">
+  <Border x:Name="Viewport" Background="Black" Margin="0" />
+</Window>

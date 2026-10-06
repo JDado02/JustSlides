@@ -1,0 +1,13 @@
+<Window x:Class="Regia.Output.Windows.IdentifyOverlay"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None" AllowsTransparency="True" ResizeMode="NoResize"
+        ShowInTaskbar="False" ShowActivated="False" Topmost="True" Focusable="False"
+        Background="#E6000000" Width="600" Height="320">
+  <Grid>
+    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+      <TextBlock x:Name="NumberText" FontSize="150" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" />
+      <TextBlock x:Name="NameText" FontSize="28" Foreground="#FFB0B0B0" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="560" />
+    </StackPanel>
+  </Grid>
+</Window>

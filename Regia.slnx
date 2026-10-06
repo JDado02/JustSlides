@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Regia.App/Regia.App.csproj" />
+    <Project Path="src/Regia.Core/Regia.Core.csproj" />
+    <Project Path="src/Regia.Output/Regia.Output.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Regia.Tests/Regia.Tests.csproj" />
+  </Folder>
+</Solution>
