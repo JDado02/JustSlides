@@ -9,7 +9,7 @@ namespace Regia.PptHost;
 
 internal static class Program
 {
-    /// <summary>Uso: Regia.PptHost.exe --pipe &lt;nome&gt; --parent &lt;pid della regia&gt;</summary>
+    /// <summary>Uso: JustSlides.PptHost.exe --pipe &lt;nome&gt; --parent &lt;pid della regia&gt;</summary>
     private static int Main(string[] args)
     {
         var pipe = ArgValue(args, "--pipe");

@@ -20,13 +20,13 @@ Guida rapida per l'operatore. Per i dettagli tecnici: `CLAUDE.md` (specifica) e 
 - [ ] Clicker del relatore: provalo (frecce / PagGiù / PagSu) con uno slideshow a schermo.
 
 **La regia**
-- [ ] Avvio: `Regia.App.exe`. Se è già aperta, una seconda copia non parte (porta in primo piano la prima).
+- [ ] Avvio: `JustSlides.exe`. (La prima volta dopo il passaggio dal vecchio nome "Regia" i dati si portano da soli da `%LOCALAPPDATA%\Regia` a `%LOCALAPPDATA%\JustSlides`: show, impostazioni e tasti si copiano, la cache dei file si sposta.) Se è già aperta, una seconda copia non parte (porta in primo piano la prima).
 - [ ] Impostazioni → Monitor di output: scegli il proiettore (pulsante "Identifica" per riconoscerlo); **niente banner arancione "simulazione"**.
 - [ ] Impostazioni → Tappo (immagine o video in loop), dissolvenza (default 500 ms), cartella contenuti dell'evento.
 - [ ] Scaletta: tutti i file con pallino **verde** (pronti). Rosso = non mandabile; arancione = avviso (leggi il dettaglio: font mancanti, collegamenti rotti...).
 - [ ] **Prova generale**: manda in onda un PPT, un video e un PDF/immagine del vero evento; verifica audio, posizione sul proiettore, slide avanti/indietro con il clicker, **T** (Torna al Tappo) ed **Esc** (PANIC).
 - [ ] **Prova hotplug**: a Tappo, spegni il proiettore (o stacca il cavo) → banner rosso "OUTPUT SCOLLEGATO", la regia non viene coperta; riaccendi → dopo ~2 s il Tappo riappare da solo. Poi GO funziona.
-- [ ] **Stress breve sul PC dell'evento** (facoltativo ma consigliato, ~2 minuti): chiudi la regia e avviala con `Regia.App.exe --stress 20`. Parte da sola, banner viola; al termine scrive il riepilogo in `%LOCALAPPDATA%\Regia\logs\stress-*.txt`. Deve dire **Falliti: 0**. Esc lo interrompe.
+- [ ] **Stress breve sul PC dell'evento** (facoltativo ma consigliato, ~2 minuti): chiudi la regia e avviala con `JustSlides.exe --stress 20`. Parte da sola, banner viola; al termine scrive il riepilogo in `%LOCALAPPDATA%\JustSlides\logs\stress-*.txt`. Deve dire **Falliti: 0**. Esc lo interrompe.
   Per la prova completa (100 cicli, guasti iniettati): `--stress 100 --faults` (~10 minuti, **solo con la regia a vuoto, mai durante un evento**).
 
 ---
@@ -74,8 +74,8 @@ Guida rapida per l'operatore. Per i dettagli tecnici: `CLAUDE.md` (specifica) e 
 | Video "sporco" o scatta | Prova il file in prova generale; in diretta: **T**, poi GO. Un file con errore di decodifica porta da solo a Errore + Tappo. |
 | Output nero ma stato "Tappo" | Premi **T** o Esc; se persiste, Impostazioni → Applica (riposiziona le finestre). |
 
-**Log**: `%LOCALAPPDATA%\Regia\logs\` (un file al giorno, con ora di ogni GO, comando ed errore). Se qualcosa è andato storto, tieni il file del giorno e annota l'ora.
-Show corrente: `%LOCALAPPDATA%\Regia\show.json`; archivi degli eventi passati in `shows\`.
+**Log**: `%LOCALAPPDATA%\JustSlides\logs\` (un file al giorno, con ora di ogni GO, comando ed errore). Se qualcosa è andato storto, tieni il file del giorno e annota l'ora.
+Show corrente: `%LOCALAPPDATA%\JustSlides\show.json`; archivi degli eventi passati in `shows\`.
 
 ---
 

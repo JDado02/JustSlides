@@ -22,9 +22,11 @@ public sealed class SettingsStore
 
     public string Path => _path;
 
-    /// <summary>Cartella dati predefinita: %LOCALAPPDATA%\Regia.</summary>
+    /// <summary>Cartella dati predefinita: %LOCALAPPDATA%\JustSlides (o quella indicata da <see cref="DataMigration.DataDirVariable"/>, solo per prove e sviluppo).</summary>
     public static string DefaultDirectory =>
-        System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Regia");
+        Environment.GetEnvironmentVariable(DataMigration.DataDirVariable) is { Length: > 0 } custom
+            ? custom
+            : System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), DataMigration.FolderName);
 
     public static string DefaultPath => System.IO.Path.Combine(DefaultDirectory, "settings.json");
 

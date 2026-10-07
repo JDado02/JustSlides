@@ -1,4 +1,4 @@
-# Slide Center / Show Caller — Specifica di progetto
+# JustSlides — Specifica di progetto
 
 Software di regia congressuale per Windows 11: l'operatore carica i file (PPT, PDF, MP4, JPG/PNG),
 li vede in Preview e li manda in onda su un monitor di Output, sempre passando per un "Tappo"

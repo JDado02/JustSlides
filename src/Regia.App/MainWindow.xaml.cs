@@ -113,8 +113,8 @@ public partial class MainWindow : Window
 
         var answer = MessageBox.Show(
             this,
-            "Qualcosa è ancora in onda. Chiudere davvero la regia?",
-            "Regia",
+            "Qualcosa è ancora in onda. Chiudere davvero JustSlides?",
+            AppInfo.ProductName,
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning,
             MessageBoxResult.No);

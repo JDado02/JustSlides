@@ -28,7 +28,7 @@ public sealed class PptHostClient : IDisposable
     public const string ForeignInstanceMessage =
         "PowerPoint è già aperto (probabilmente dall'utente): chiuderlo prima di mandare in onda una presentazione.";
 
-    private const string HostExeName = "Regia.PptHost.exe";
+    private const string HostExeName = "JustSlides.PptHost.exe";
     private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan HelloTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan StartShowTimeout = TimeSpan.FromSeconds(15);
@@ -294,7 +294,7 @@ public sealed class PptHostClient : IDisposable
             if (!File.Exists(exe))
                 throw new PptException(PptException.HostStartFailed, $"{HostExeName} non trovato accanto alla regia");
 
-            var pipeName = "Regia.PptHost." + Guid.NewGuid().ToString("N");
+            var pipeName = "JustSlides.PptHost." + Guid.NewGuid().ToString("N");
             var pipe = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte,
                 PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
 

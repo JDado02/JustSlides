@@ -1,7 +1,8 @@
 <Window x:Class="Regia.Output.Windows.TappoWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Regia - Output Tappo"
+        Title="JustSlides - Output Tappo"
+        Icon="pack://application:,,,/Regia.Output;component/Assets/JustSlides.ico"
         WindowStyle="None" AllowsTransparency="True" ResizeMode="NoResize"
         ShowInTaskbar="False" ShowActivated="False" Focusable="False"
         Background="Black" Width="640" Height="360">

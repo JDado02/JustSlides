@@ -9,6 +9,11 @@
     <VlcWindowsX64IncludeFiles>true</VlcWindowsX64IncludeFiles>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Icona di JustSlides (anche per le finestre di output e la regia): pack://application:,,,/Regia.Output;component/Assets/JustSlides.ico -->
+    <Resource Include="Assets\JustSlides.ico" />
+    <Resource Include="Assets\JustSlides-512.png" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Regia.Core\Regia.Core.csproj" />
     <PackageReference Include="LibVLCSharp" />
     <PackageReference Include="NAudio.Wasapi" />

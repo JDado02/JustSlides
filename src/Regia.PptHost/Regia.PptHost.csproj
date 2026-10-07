@@ -5,6 +5,13 @@
     <!-- WPF solo per il Dispatcher del thread STA: nessuna finestra, nessun App.xaml -->
     <UseWPF>true</UseWPF>
     <RootNamespace>Regia.PptHost</RootNamespace>
+    <!-- In Gestione attività compare come JustSlides.PptHost.exe -->
+    <AssemblyName>JustSlides.PptHost</AssemblyName>
+    <Product>JustSlides</Product>
+    <AssemblyTitle>JustSlides PowerPoint Host</AssemblyTitle>
+    <Description>JustSlides - processo che pilota PowerPoint per conto della regia</Description>
+    <Version>1.0.0</Version>
+    <ApplicationIcon>..\Regia.Output\Assets\JustSlides.ico</ApplicationIcon>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>

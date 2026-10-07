@@ -38,19 +38,34 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        // Istanza singola: se la regia è già aperta si porta in primo piano quella.
+        // Istanza singola: se JustSlides è già aperto si porta in primo piano quello.
         _singleInstanceMutex = new Mutex(initiallyOwned: true, AppInfo.MutexName, out var isFirstInstance);
         if (!isFirstInstance)
         {
-            SystemIntegration.BringWindowToFront(AppInfo.MainWindowTitle);
+            SystemIntegration.BringOtherInstanceToFront(AppInfo.ProcessName);
             Shutdown();
             return;
         }
 
         try
         {
+            // Prima di tutto (anche del log): i dati della vecchia cartella "Regia" passano alla nuova "JustSlides".
+            var migration = DataMigration.RunForCurrentUser();
+
             LogSetup.Configure(Path.Combine(SettingsStore.DefaultDirectory, "logs"));
-            Log.Information("=== Avvio Regia (versione {Version}) ===", typeof(App).Assembly.GetName().Version);
+            Log.Information("=== Avvio {Product} (versione {Version}) ===", AppInfo.ProductName, typeof(App).Assembly.GetName().Version);
+            if (migration.Outcome == MigrationOutcome.Failed)
+            {
+                Log.Warning("{Message}", migration.Message);
+                MessageBox.Show(
+                    "I dati della versione precedente (show, impostazioni, tasti) non sono stati copiati:\n\n" + migration.Message +
+                    "\n\nJustSlides parte con dati vuoti. I vecchi dati sono ancora nella cartella \"Regia\" e la copia verrà ritentata al prossimo avvio.",
+                    AppInfo.ProductName, MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            else if (migration.Outcome == MigrationOutcome.Migrated)
+            {
+                Log.Information("{Message}", migration.Message);
+            }
 
             RegisterGlobalHandlers();
             SystemIntegration.PreventSleep();
@@ -132,7 +147,7 @@ public partial class App : Application
                 Dispatcher);
             _outputSupervisor.Start();
 
-            // Stress test (solo se richiesto: Regia.App.exe --stress 100 [--faults]).
+            // Stress test (solo se richiesto: JustSlides.exe --stress 100 [--faults]).
             if (TryParseStressArgs(e.Args, out var stressCycles, out var stressFaults))
             {
                 var runner = new StressRunner(
@@ -150,7 +165,7 @@ public partial class App : Application
         {
             Log.Fatal(ex, "Errore irreversibile all'avvio");
             Log.CloseAndFlush();
-            MessageBox.Show($"La regia non è riuscita ad avviarsi:\n\n{ex.Message}", "Regia", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"{AppInfo.ProductName} non è riuscito ad avviarsi:\n\n{ex.Message}", AppInfo.ProductName, MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
     }
@@ -210,7 +225,7 @@ public partial class App : Application
     {
         try
         {
-            Log.Information("=== Chiusura Regia ===");
+            Log.Information("=== Chiusura {Product} ===", AppInfo.ProductName);
             _keyboardHook?.Dispose();
             _outputSupervisor?.Dispose();
             _outputMirror?.Dispose();

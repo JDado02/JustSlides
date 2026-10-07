@@ -4,6 +4,7 @@
         xmlns:ppt="clr-namespace:Regia.Core.Ppt;assembly=Regia.Core"
         Style="{StaticResource {x:Type Window}}"
         Title="Impostazioni evento" Width="640" Height="700" MinWidth="520" MinHeight="560"
+        Icon="pack://application:,,,/Regia.Output;component/Assets/JustSlides.ico"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
   <Window.Resources>
     <BooleanToVisibilityConverter x:Key="BoolToVis" />

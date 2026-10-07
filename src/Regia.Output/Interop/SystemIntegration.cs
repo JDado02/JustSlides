@@ -15,16 +15,31 @@ public static class SystemIntegration
             EXECUTION_STATE.ES_CONTINUOUS | EXECUTION_STATE.ES_SYSTEM_REQUIRED | EXECUTION_STATE.ES_DISPLAY_REQUIRED);
     }
 
-    /// <summary>Porta in primo piano la finestra con il titolo indicato (istanza già in esecuzione).</summary>
-    public static bool BringWindowToFront(string title)
+    /// <summary>
+    /// Porta in primo piano la finestra principale di un'altra istanza già in esecuzione, cercando solo tra i processi con quel nome
+    /// (mai per titolo: "JustSlides" è anche il nome di una cartella e di altre finestre).
+    /// </summary>
+    public static bool BringOtherInstanceToFront(string processName)
     {
-        var hwnd = PInvoke.FindWindow(null, title);
-        if (hwnd.IsNull)
-            return false;
+        var self = Environment.ProcessId;
+        foreach (var process in System.Diagnostics.Process.GetProcessesByName(processName))
+        {
+            using (process)
+            {
+                if (process.Id == self)
+                    continue;
 
-        if (PInvoke.IsIconic(hwnd))
-            PInvoke.ShowWindow(hwnd, SHOW_WINDOW_CMD.SW_RESTORE);
+                var hwnd = new HWND(process.MainWindowHandle);
+                if (hwnd.IsNull)
+                    continue;
 
-        return PInvoke.SetForegroundWindow(hwnd);
+                if (PInvoke.IsIconic(hwnd))
+                    PInvoke.ShowWindow(hwnd, SHOW_WINDOW_CMD.SW_RESTORE);
+
+                return PInvoke.SetForegroundWindow(hwnd);
+            }
+        }
+
+        return false;
     }
 }

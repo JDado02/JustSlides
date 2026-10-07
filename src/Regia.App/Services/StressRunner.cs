@@ -14,7 +14,7 @@ using Serilog;
 namespace Regia.App.Services;
 
 /// <summary>
-/// Stress test (<c>Regia.App.exe --stress N [--faults]</c>): manda in onda a ripetizione i file della scaletta passando dagli
+/// Stress test (<c>JustSlides.exe --stress N [--faults]</c>): manda in onda a ripetizione i file della scaletta passando dagli
 /// stessi comandi dell'operatore, con azioni, uscite e (con <c>--faults</c>) guasti iniettati, e misura memoria, handle e tempi.
 /// La sequenza viene da <see cref="StressPlan"/> (seme registrato nel log). Esc = PANIC e interrompe il test.
 /// Gira sul thread UI come l'operatore; ogni attesa ha un tetto, a tetto scaduto il ciclo è "fallito" e si torna al Tappo.

@@ -4,6 +4,13 @@
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <UseWPF>true</UseWPF>
     <RootNamespace>Regia.App</RootNamespace>
+    <!-- Nome del prodotto: eseguibile JustSlides.exe. Progetti e namespace restano Regia.* (scelta: rinomina solo di ciò che si vede). -->
+    <AssemblyName>JustSlides</AssemblyName>
+    <Product>JustSlides</Product>
+    <AssemblyTitle>JustSlides</AssemblyTitle>
+    <Description>JustSlides - regia per presentazioni, video e PDF</Description>
+    <Version>1.0.0</Version>
+    <ApplicationIcon>..\Regia.Output\Assets\JustSlides.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <VlcWindowsX86IncludeFiles>false</VlcWindowsX86IncludeFiles>
     <VlcWindowsX64IncludeFiles>true</VlcWindowsX64IncludeFiles>
@@ -11,7 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Regia.Core\Regia.Core.csproj" />
     <ProjectReference Include="..\Regia.Output\Regia.Output.csproj" />
-    <!-- PptHost è un exe separato: si compila prima, poi lo si copia accanto a Regia.App.exe (vedi CopyPptHost) -->
+    <!-- PptHost è un exe separato: si compila prima, poi lo si copia accanto a JustSlides.exe (vedi CopyPptHost) -->
     <ProjectReference Include="..\Regia.PptHost\Regia.PptHost.csproj" ReferenceOutputAssembly="false" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
@@ -19,15 +26,15 @@
     <PackageReference Include="Serilog.Sinks.File" />
   </ItemGroup>
 
-  <!-- Copia l'uscita di PptHost (exe, dll, runtimeconfig, deps) accanto a Regia.App.exe. Le dll in comune (Regia.Core, Serilog) sono le stesse. -->
+  <!-- Copia l'uscita di PptHost (exe, dll, runtimeconfig, deps) accanto a JustSlides.exe. Le dll in comune (Regia.Core, Serilog) sono le stesse. -->
   <Target Name="CopyPptHost" AfterTargets="Build">
     <PropertyGroup>
       <PptHostOutDir>$(MSBuildThisFileDirectory)..\Regia.PptHost\bin\$(Configuration)\$(TargetFramework)\$(RuntimeIdentifier)\</PptHostOutDir>
     </PropertyGroup>
     <ItemGroup>
-      <PptHostFile Include="$(PptHostOutDir)Regia.PptHost.*" />
+      <PptHostFile Include="$(PptHostOutDir)JustSlides.PptHost.*" />
     </ItemGroup>
-    <Error Condition="'@(PptHostFile)' == ''" Text="Regia.PptHost non trovato in $(PptHostOutDir)" />
+    <Error Condition="'@(PptHostFile)' == ''" Text="JustSlides.PptHost non trovato in $(PptHostOutDir)" />
     <Copy SourceFiles="@(PptHostFile)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
   </Target>
 </Project>
