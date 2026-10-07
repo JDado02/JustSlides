@@ -43,9 +43,18 @@ internal static unsafe class WindowPlacement
     /// </summary>
     public static void PlaceBehind(Window window, nint other)
     {
+        // SWP_ASYNCWINDOWPOS: la richiesta non aspetta il thread dell'altra finestra (PowerPoint bloccato da un dialogo).
         PInvoke.SetWindowPos(GetHandle(window), new HWND(other), 0, 0, 0, 0,
-            SET_WINDOW_POS_FLAGS.SWP_NOMOVE | SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE);
+            SET_WINDOW_POS_FLAGS.SWP_NOMOVE | SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE
+            | SET_WINDOW_POS_FLAGS.SWP_ASYNCWINDOWPOS);
     }
+
+    /// <summary>La finestra non risponde ai messaggi (programma bloccato): non va toccata dal thread UI.</summary>
+    public static bool IsHung(nint hwnd) => IsHungAppWindow(hwnd);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool IsHungAppWindow(nint hwnd);
 
     public static void SetPosition(Window window, PixelRect rect, ZOrder zOrder)
     {

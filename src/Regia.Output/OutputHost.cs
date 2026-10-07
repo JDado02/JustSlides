@@ -209,14 +209,14 @@ public sealed class OutputHost : IDisposable
         if (!_shown)
             return;
 
-        // Con uno slideshow di PowerPoint il Tappo è sempre topmost (anche in simulazione): lo slideshow non lo è e non si può
-        // alzare da fuori, quindi è il Tappo a stargli sopra per costruzione.
-        var topmost = Mode == OutputMode.Real || _showWindow != 0;
-        Tappo.Placement.Set(CurrentRect(), topmost ? ZOrder.Topmost : ZOrder.Top);
+        // Monitor reale: il Tappo è topmost, lo slideshow (altro processo) no e non si può alzare da fuori, quindi il Tappo gli
+        // sta sopra per costruzione. Simulazione: nessuna finestra di output è topmost, il Tappo viene riportato in cima a ogni
+        // cambio di finestra attiva e la finestra della regia resta sopra a tutte (vedi AttachShowWindow): mai coperta dal Tappo.
+        Tappo.Placement.Set(CurrentRect(), Mode == OutputMode.Real ? ZOrder.Topmost : ZOrder.Top);
 
-        // In simulazione la cornice (nera) e la finestra Contenuto non devono coprire lo slideshow: si mettono dietro di lui.
-        // Serve ripeterlo a ogni attivazione della regia, che alza la sua catena di finestre.
-        if (_showWindow != 0 && Mode == OutputMode.Simulation && _simulation is not null)
+        // In simulazione la cornice (nera) non deve coprire lo slideshow: si mette dietro di lui (chiamata asincrona e mai
+        // verso un PowerPoint che non risponde: un SetWindowPos verso una finestra bloccata potrebbe congelare la regia).
+        if (_showWindow != 0 && Mode == OutputMode.Simulation && _simulation is not null && !WindowPlacement.IsHung(_showWindow))
             WindowPlacement.PlaceBehind(_simulation, _showWindow);
     }
 
@@ -235,7 +235,10 @@ public sealed class OutputHost : IDisposable
         // In simulazione la cornice possiede Contenuto (che possiede il Tappo) e spostare un proprietario muove tutto il gruppo:
         // per metterla dietro lo slideshow si scioglie il legame cornice→Contenuto finché lo slideshow c'è.
         if (Mode == OutputMode.Simulation)
+        {
             WindowPlacement.SetOwner(Content, null);
+            SetOperatorOnTop(true);
+        }
 
         var rect = CurrentRect();
         Content.Placement.Set(new PixelRect(rect.X, rect.Y, 1, 1), ZOrder.NotTopmost);
@@ -260,12 +263,28 @@ public sealed class OutputHost : IDisposable
         }
         else
         {
-            // Il Tappo smette di essere topmost (NOTOPMOST agisce solo se lo era), si ripristina il legame cornice→Contenuto
-            // e la cornice rimette tutto a posto.
-            Tappo.Placement.Set(rect, ZOrder.NotTopmost);
+            // Si ripristina il legame cornice→Contenuto e la cornice rimette tutto a posto.
+            SetOperatorOnTop(false);
             if (_simulation is not null)
                 WindowPlacement.SetOwner(Content, _simulation);
             LayoutSimulation();
+        }
+    }
+
+    /// <summary>
+    /// In simulazione, durante uno slideshow, la finestra della regia sta sopra a tutte quelle di output (cornice, Tappo,
+    /// slideshow): senza, il Tappo opaco coprirebbe i comandi e non ci sarebbe modo di togliere.
+    /// </summary>
+    private static void SetOperatorOnTop(bool onTop)
+    {
+        try
+        {
+            if (System.Windows.Application.Current?.MainWindow is { } main)
+                main.Topmost = onTop;
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "Finestra della regia: impossibile cambiare Topmost");
         }
     }
 

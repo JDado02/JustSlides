@@ -106,8 +106,11 @@ internal sealed class PowerPointDriver
         if (others > 0)
             Log.Warning("PowerPoint ha già {Count} presentazioni aperte prima di aprire {Path}", others, path);
 
+        TrySet(() => _app!.DisplayAlerts = 1);  // ppAlertsNone, di nuovo: PowerPoint può averlo azzerato
+
         // ReadOnly, senza finestra di documento.
         _presentation = _app!.Presentations.Open(path, -1, 0, 0);
+        MarkClean();
 
         int slides = _presentation.Slides.Count;
         double width = _presentation.PageSetup.SlideWidth;
@@ -120,6 +123,9 @@ internal sealed class PowerPointDriver
     {
         if (_presentation is null)
             throw new PptHostException(PptErrors.NoPresentation, "Nessuna presentazione aperta.");
+
+        TrySet(() => _app!.DisplayAlerts = 1);
+        MarkClean();
 
         var settings = _presentation.SlideShowSettings;
         settings.ShowType = args.Windowed ? 2 : 1;   // ppShowTypeWindow (solo simulazione) / ppShowTypeSpeaker. MAI Kiosk.
@@ -255,19 +261,21 @@ internal sealed class PowerPointDriver
         _showActive = false;
         _target = null;
 
-        if (_showWindow is not null)
-        {
-            TrySet(() => _showWindow!.View.Exit());
-            Release((object?)_showWindow);
-            _showWindow = null;
-        }
-
+        // Prima "pulita", poi chiusa: se PowerPoint la trova modificata alla chiusura chiede "vuoi salvare?", e quel dialogo
+        // modale blocca ogni chiamata COM (e il watchdog finisce per terminare tutto). Chiudere la presentazione termina anche lo show.
+        MarkClean();
         if (_presentation is not null)
         {
-            TrySet(() => _presentation!.Saved = -1);  // sola lettura: niente richieste di salvataggio
             TrySet(() => _presentation!.Close());
             Release((object?)_presentation);
             _presentation = null;
+        }
+
+        if (_showWindow is not null)
+        {
+            TrySet(() => _showWindow!.View.Exit());   // di norma già chiuso insieme alla presentazione
+            Release((object?)_showWindow);
+            _showWindow = null;
         }
 
         RestoreDisplayMonitor();
@@ -344,6 +352,9 @@ internal sealed class PowerPointDriver
                 return;
             }
 
+            MarkClean();
+            WarnIfDialogOpen();
+
             int windows = _app.SlideShowWindows.Count;
             if (windows == 0)
             {
@@ -371,6 +382,62 @@ internal sealed class PowerPointDriver
         finally
         {
             _busy.End();
+        }
+    }
+
+    /// <summary>
+    /// La presentazione è aperta in sola lettura e non va mai salvata: si segna "salvata" così alla chiusura (anche quella
+    /// decisa da PowerPoint a fine slideshow) non compare la richiesta di salvataggio.
+    /// </summary>
+    private void MarkClean()
+    {
+        if (_presentation is null)
+            return;
+
+        try
+        {
+            _presentation.Saved = -1;
+        }
+        catch (COMException)
+        {
+            // Presentazione già chiusa da PowerPoint: niente da fare.
+        }
+    }
+
+    private bool _dialogWarned;
+
+    /// <summary>Un dialogo modale di PowerPoint blocca le chiamate COM: se compare lo si scrive nel log (una volta) per capirne il motivo.</summary>
+    private void WarnIfDialogOpen()
+    {
+        string? title = null;
+        Native.EnumWindows((hwnd, _) =>
+        {
+            if (!Native.IsWindowVisible(hwnd))
+                return true;
+
+            Native.GetWindowThreadProcessId(hwnd, out var pid);
+            if (pid != (uint)_powerPointPid)
+                return true;
+
+            var cls = new System.Text.StringBuilder(32);
+            Native.GetClassName(hwnd, cls, cls.Capacity);
+            if (cls.ToString() != "#32770")
+                return true;
+
+            var text = new System.Text.StringBuilder(128);
+            Native.GetWindowText(hwnd, text, text.Capacity);
+            title = text.ToString();
+            return false;
+        }, IntPtr.Zero);
+
+        if (title is null)
+        {
+            _dialogWarned = false;
+        }
+        else if (!_dialogWarned)
+        {
+            _dialogWarned = true;
+            Log.Warning("PowerPoint mostra un dialogo (\"{Title}\"): le chiamate COM resteranno bloccate finché non viene chiuso", title);
         }
     }
 
