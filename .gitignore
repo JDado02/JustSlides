@@ -5,3 +5,7 @@ obj/
 *.suo
 TestResults/
 .claude/settings.local.json
+
+# Installer: output e prerequisiti scaricati
+artifacts/
+installer/prereq/
