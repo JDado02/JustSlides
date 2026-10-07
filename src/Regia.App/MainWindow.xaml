@@ -2,271 +2,508 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:core="clr-namespace:Regia.Core.Wave;assembly=Regia.Core"
+        xmlns:app="clr-namespace:Regia.App"
         Style="{StaticResource {x:Type Window}}"
-        Title="Regia - Slide Center" Width="760" Height="960" MinWidth="560" MinHeight="760"
+        Title="Regia - Slide Center" Width="1500" Height="940" MinWidth="1120" MinHeight="780"
         WindowStartupLocation="CenterScreen">
-  <Grid Margin="20">
+  <Window.Resources>
+    <app:ThumbnailConverter x:Key="Thumb" />
+    <app:PreflightBrushConverter x:Key="PreflightBrush" />
+
+    <!-- Testo che sparisce se la stringa è vuota -->
+    <Style x:Key="HideWhenEmpty" TargetType="TextBlock">
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=Text}" Value="">
+          <Setter Property="Visibility" Value="Collapsed" />
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+
+    <!-- Voce della scaletta: linea di inserimento durante il riordino, voce esclusa attenuata -->
+    <Style x:Key="ScalettaItem" TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="BorderBrush" Value="#FFFFB300" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Style.Triggers>
+        <Trigger Property="app:DragDropState.DropPosition" Value="Before">
+          <Setter Property="BorderThickness" Value="0,3,0,0" />
+        </Trigger>
+        <Trigger Property="app:DragDropState.DropPosition" Value="After">
+          <Setter Property="BorderThickness" Value="0,0,0,3" />
+        </Trigger>
+        <DataTrigger Binding="{Binding Excluded}" Value="True">
+          <Setter Property="Opacity" Value="0.45" />
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+  </Window.Resources>
+
+  <Grid Margin="16">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
-      <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
-      <RowDefinition Height="Auto" />
-      <RowDefinition Height="Auto" />
-      <RowDefinition Height="Auto" />
-      <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
-    <DockPanel Grid.Row="0" Margin="0,0,0,14">
-      <Button DockPanel.Dock="Right" Content="Impostazioni" Click="OnSettingsClick" />
+    <!-- Barra superiore -->
+    <DockPanel Grid.Row="0" Margin="0,0,0,10">
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+        <Button Content="Nuovo evento" Command="{Binding NewEventCommand}" Margin="0,0,8,0" />
+        <Button Content="Impostazioni" Click="OnSettingsClick" />
+      </StackPanel>
       <TextBlock Text="REGIA" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+      <TextBlock Text="{Binding SourceLabel}" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center"
+                 Margin="18,0,0,0" TextTrimming="CharacterEllipsis" />
     </DockPanel>
 
-    <!-- Stato onda ben visibile -->
-    <Border Grid.Row="1" CornerRadius="10" MinHeight="110" Margin="0,0,0,14">
-      <Border.Style>
-        <Style TargetType="Border">
-          <Setter Property="Background" Value="{StaticResource TappoBrush}" />
-          <Style.Triggers>
-            <DataTrigger Binding="{Binding State}" Value="{x:Static core:WaveState.InOnda}">
-              <Setter Property="Background" Value="{StaticResource OnAirBrush}" />
-            </DataTrigger>
-            <DataTrigger Binding="{Binding State}" Value="{x:Static core:WaveState.InTransizioneIn}">
-              <Setter Property="Background" Value="{StaticResource TransitionBrush}" />
-            </DataTrigger>
-            <DataTrigger Binding="{Binding State}" Value="{x:Static core:WaveState.InTransizioneOut}">
-              <Setter Property="Background" Value="{StaticResource TransitionBrush}" />
-            </DataTrigger>
-            <DataTrigger Binding="{Binding State}" Value="{x:Static core:WaveState.Caricamento}">
-              <Setter Property="Background" Value="{StaticResource TransitionBrush}" />
-            </DataTrigger>
-            <DataTrigger Binding="{Binding State}" Value="{x:Static core:WaveState.Errore}">
-              <Setter Property="Background" Value="{StaticResource ErrorBrush}" />
-            </DataTrigger>
-          </Style.Triggers>
-        </Style>
-      </Border.Style>
-      <TextBlock Text="{Binding StateText}" FontSize="48" FontWeight="Bold" Foreground="White"
-                 HorizontalAlignment="Center" VerticalAlignment="Center" />
-    </Border>
+    <!-- Avvisi: generico, audio (PowerPoint), cartella contenuti -->
+    <StackPanel Grid.Row="1">
+      <Border Background="#FF4A2B00" BorderBrush="#FFB26A00" BorderThickness="1" CornerRadius="6"
+              Padding="12,8" Margin="0,0,0,8">
+        <Border.Style>
+          <Style TargetType="Border">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding HasWarning}" Value="True">
+                <Setter Property="Visibility" Value="Visible" />
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </Border.Style>
+        <TextBlock Text="{Binding Warning}" TextWrapping="Wrap" Foreground="#FFFFD79A" FontSize="14" />
+      </Border>
 
-    <!-- Avvisi (monitor mancante, errori...) -->
-    <StackPanel Grid.Row="2">
-    <Border Background="#FF4A2B00" BorderBrush="#FFB26A00" BorderThickness="1" CornerRadius="6"
-            Padding="12,8" Margin="0,0,0,14">
-      <Border.Style>
-        <Style TargetType="Border">
-          <Setter Property="Visibility" Value="Collapsed" />
-          <Style.Triggers>
-            <DataTrigger Binding="{Binding HasWarning}" Value="True">
-              <Setter Property="Visibility" Value="Visible" />
-            </DataTrigger>
-          </Style.Triggers>
-        </Style>
-      </Border.Style>
-      <TextBlock Text="{Binding Warning}" TextWrapping="Wrap" Foreground="#FFFFD79A" FontSize="14" />
-    </Border>
+      <Border Background="#FF4A2B00" BorderBrush="#FFB26A00" BorderThickness="1" CornerRadius="6"
+              Padding="12,8" Margin="0,0,0,8">
+        <Border.Style>
+          <Style TargetType="Border">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding HasAudioDeviceWarning}" Value="True">
+                <Setter Property="Visibility" Value="Visible" />
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </Border.Style>
+        <DockPanel>
+          <Button DockPanel.Dock="Right" Content="Apri impostazioni audio" Command="{Binding OpenWindowsSoundSettingsCommand}"
+                  Padding="12,4" Margin="12,0,0,0" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding AudioDeviceWarning}" TextWrapping="Wrap" Foreground="#FFFFD79A" FontSize="14"
+                     VerticalAlignment="Center" />
+        </DockPanel>
+      </Border>
 
-    <!-- Avviso fisso: PowerPoint suona sul predefinito di Windows, non sul dispositivo scelto -->
-    <Border Background="#FF4A2B00" BorderBrush="#FFB26A00" BorderThickness="1" CornerRadius="6"
-            Padding="12,8" Margin="0,0,0,14">
-      <Border.Style>
-        <Style TargetType="Border">
-          <Setter Property="Visibility" Value="Collapsed" />
-          <Style.Triggers>
-            <DataTrigger Binding="{Binding HasAudioDeviceWarning}" Value="True">
-              <Setter Property="Visibility" Value="Visible" />
-            </DataTrigger>
-          </Style.Triggers>
-        </Style>
-      </Border.Style>
-      <DockPanel>
-        <Button DockPanel.Dock="Right" Content="Apri impostazioni audio" Command="{Binding OpenWindowsSoundSettingsCommand}"
-                Padding="12,4" Margin="12,0,0,0" VerticalAlignment="Center" />
-        <TextBlock Text="{Binding AudioDeviceWarning}" TextWrapping="Wrap" Foreground="#FFFFD79A" FontSize="14"
-                   VerticalAlignment="Center" />
-      </DockPanel>
-    </Border>
+      <!-- Cartella contenuti: non configurata (arancione) o non raggiungibile (rosso) -->
+      <Border CornerRadius="6" Padding="12,8" Margin="0,0,0,8" BorderThickness="1">
+        <Border.Style>
+          <Style TargetType="Border">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Setter Property="Background" Value="#FF4A2B00" />
+            <Setter Property="BorderBrush" Value="#FFB26A00" />
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding HasSourceMessage}" Value="True">
+                <Setter Property="Visibility" Value="Visible" />
+              </DataTrigger>
+              <DataTrigger Binding="{Binding SourceMessageIsError}" Value="True">
+                <Setter Property="Background" Value="#FF5A1010" />
+                <Setter Property="BorderBrush" Value="#FFC62828" />
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </Border.Style>
+        <DockPanel>
+          <Button DockPanel.Dock="Right" Content="Imposta cartella..." Click="OnSettingsClick"
+                  Padding="12,4" Margin="12,0,0,0" VerticalAlignment="Center">
+            <Button.Style>
+              <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding SourceNotConfigured}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </Button.Style>
+          </Button>
+          <TextBlock Text="{Binding SourceMessage}" TextWrapping="Wrap" Foreground="#FFFFD79A" FontSize="14"
+                     VerticalAlignment="Center" />
+        </DockPanel>
+      </Border>
     </StackPanel>
 
-    <!-- Lista file provvisoria (la scaletta vera arriva in M6) -->
-    <DockPanel Grid.Row="3" Margin="0,0,0,14">
-      <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
-        <StackPanel Orientation="Horizontal">
-          <Button Content="Aggiungi file..." Click="OnAddFilesClick" Padding="14,6" />
-          <Button Content="Rimuovi" Command="{Binding RemoveSelectedCommand}" Padding="14,6" Margin="8,0,0,0" />
-        </StackPanel>
+    <Grid Grid.Row="2">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="5*" MinWidth="460" />
+        <ColumnDefinition Width="14" />
+        <ColumnDefinition Width="6*" MinWidth="520" />
+      </Grid.ColumnDefinitions>
 
-        <!-- Stato di PowerPoint/PptHost: solo se c'è un PPT in lista -->
-        <TextBlock Text="{Binding PptStatusText}" Margin="0,8,0,0" Opacity="0.75">
-          <TextBlock.Style>
-            <Style TargetType="TextBlock">
-              <Setter Property="Visibility" Value="Collapsed" />
-              <Style.Triggers>
-                <DataTrigger Binding="{Binding HasPptItems}" Value="True">
-                  <Setter Property="Visibility" Value="Visible" />
-                </DataTrigger>
-              </Style.Triggers>
-            </Style>
-          </TextBlock.Style>
-        </TextBlock>
+      <!-- ============================ SINISTRA: scaletta ============================ -->
+      <DockPanel Grid.Column="0">
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+            <CheckBox Content="Mostra esclusi" IsChecked="{Binding ShowExcluded}" VerticalAlignment="Center" Margin="0,0,12,0" />
+            <Button Content="Nascondi / mostra voce" Command="{Binding ToggleExcludeSelectedCommand}" Padding="10,5"
+                    ToolTip="Toglie la voce dalla scaletta senza toccare la cartella (si può rimettere con 'Mostra esclusi')" />
+          </StackPanel>
+          <TextBlock Text="SCALETTA" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+        </DockPanel>
 
-        <!-- Opzioni del video selezionato: valgono dal prossimo GO e si ricordano per ogni file -->
-        <StackPanel Margin="0,10,0,0">
-          <StackPanel.Style>
-            <Style TargetType="StackPanel">
-              <Setter Property="Visibility" Value="Collapsed" />
-              <Style.Triggers>
-                <DataTrigger Binding="{Binding IsSelectedAudio}" Value="True">
-                  <Setter Property="Visibility" Value="Visible" />
-                </DataTrigger>
-              </Style.Triggers>
-            </Style>
-          </StackPanel.Style>
-          <StackPanel Orientation="Horizontal">
+        <!-- Dettagli della voce selezionata: sessione, relatore, opzioni per file -->
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+          <Grid IsEnabled="{Binding HasEditableSelection}">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="Sessione" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <TextBox Grid.Column="1" Text="{Binding SelectedSession, UpdateSourceTrigger=LostFocus}" />
+            <TextBlock Grid.Column="2" Text="Relatore" VerticalAlignment="Center" Margin="14,0,8,0" />
+            <TextBox Grid.Column="3" Text="{Binding SelectedItem.Speaker, UpdateSourceTrigger=LostFocus}" />
+          </Grid>
+
+          <StackPanel Margin="0,8,0,0">
             <StackPanel.Style>
               <Style TargetType="StackPanel">
                 <Setter Property="Visibility" Value="Collapsed" />
                 <Style.Triggers>
-                  <DataTrigger Binding="{Binding IsSelectedVideo}" Value="True">
+                  <DataTrigger Binding="{Binding IsSelectedAudio}" Value="True">
                     <Setter Property="Visibility" Value="Visible" />
                   </DataTrigger>
                 </Style.Triggers>
               </Style>
             </StackPanel.Style>
-            <TextBlock Text="A fine video:" VerticalAlignment="Center" Margin="0,0,10,0" />
-            <RadioButton Content="Torna al Tappo" GroupName="VideoEnd" IsChecked="{Binding EndReturnToTappo}" />
-            <RadioButton Content="Fermo" GroupName="VideoEnd" IsChecked="{Binding EndHoldLastFrame}"
-                         ToolTip="Resta fermo sull'ultimo fotogramma" />
-            <RadioButton Content="Loop" GroupName="VideoEnd" IsChecked="{Binding EndLoop}" />
+            <StackPanel Orientation="Horizontal">
+              <StackPanel.Style>
+                <Style TargetType="StackPanel">
+                  <Setter Property="Visibility" Value="Collapsed" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsSelectedVideo}" Value="True">
+                      <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </StackPanel.Style>
+              <TextBlock Text="A fine video:" VerticalAlignment="Center" Margin="0,0,10,0" />
+              <RadioButton Content="Torna al Tappo" GroupName="VideoEnd" IsChecked="{Binding EndReturnToTappo}" />
+              <RadioButton Content="Fermo" GroupName="VideoEnd" IsChecked="{Binding EndHoldLastFrame}"
+                           ToolTip="Resta fermo sull'ultimo fotogramma" />
+              <RadioButton Content="Loop" GroupName="VideoEnd" IsChecked="{Binding EndLoop}" />
+            </StackPanel>
+            <DockPanel Margin="0,8,0,0">
+              <TextBlock DockPanel.Dock="Left" Text="Volume salvato:" VerticalAlignment="Center" Margin="0,0,10,0" />
+              <TextBlock DockPanel.Dock="Right" Width="44" TextAlignment="Right" VerticalAlignment="Center"
+                         Text="{Binding SelectedVolume, StringFormat={}{0}%}" />
+              <Slider Minimum="0" Maximum="100" Value="{Binding SelectedVolume}" SmallChange="5" LargeChange="10"
+                      IsMoveToPointEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" Focusable="False"
+                      ToolTip="Volume con cui questo video o PowerPoint parte a ogni messa in onda (si ricorda per ogni file)" />
+            </DockPanel>
           </StackPanel>
-          <DockPanel Margin="0,8,0,0">
-            <TextBlock DockPanel.Dock="Left" Text="Volume salvato:" VerticalAlignment="Center" Margin="0,0,10,0" />
-            <TextBlock DockPanel.Dock="Right" Width="44" TextAlignment="Right" VerticalAlignment="Center"
-                       Text="{Binding SelectedVolume, StringFormat={}{0}%}" />
-            <Slider Minimum="0" Maximum="100" Value="{Binding SelectedVolume}" SmallChange="5" LargeChange="10"
-                    IsMoveToPointEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" Focusable="False"
-                    ToolTip="Volume con cui questo video o PowerPoint parte a ogni messa in onda (si ricorda per ogni file)" />
-          </DockPanel>
-        </StackPanel>
-      </StackPanel>
-      <ListBox ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
-               DisplayMemberPath="DisplayName" FontSize="16" MinHeight="120" />
-    </DockPanel>
 
-    <!-- Pagina N/M per i PDF e frecce -->
-    <Grid Grid.Row="4" Margin="0,0,0,14" Height="52">
-      <Grid.Style>
-        <Style TargetType="Grid">
-          <Setter Property="Visibility" Value="Hidden" />
-          <Style.Triggers>
-            <DataTrigger Binding="{Binding HasPage}" Value="True">
-              <Setter Property="Visibility" Value="Visible" />
-            </DataTrigger>
-          </Style.Triggers>
-        </Style>
-      </Grid.Style>
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="90" />
-        <ColumnDefinition Width="*" />
-        <ColumnDefinition Width="90" />
-      </Grid.ColumnDefinitions>
-      <Button Grid.Column="0" Content="&#9664;" Command="{Binding PreviousPageCommand}" FontSize="22" />
-      <TextBlock Grid.Column="1" Text="{Binding PageText}" FontSize="26" FontWeight="SemiBold"
-                 HorizontalAlignment="Center" VerticalAlignment="Center" />
-      <Button Grid.Column="2" Content="&#9654;" Command="{Binding NextPageCommand}" FontSize="22" />
-    </Grid>
-
-    <!-- Video in onda: countdown, play/pausa, volume (il pannello Program completo arriva in M7) -->
-    <StackPanel Grid.Row="5">
-    <Border Background="{StaticResource PanelBrush}" CornerRadius="8" Padding="14,10" Margin="0,0,0,14">
-      <Border.Style>
-        <Style TargetType="Border">
-          <Setter Property="Visibility" Value="Collapsed" />
-          <Style.Triggers>
-            <DataTrigger Binding="{Binding IsVideoOnAir}" Value="True">
-              <Setter Property="Visibility" Value="Visible" />
-            </DataTrigger>
-          </Style.Triggers>
-        </Style>
-      </Border.Style>
-      <Grid>
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-        <StackPanel Grid.Column="0" Margin="0,0,24,0">
-          <TextBlock Text="{Binding RemainingText}" FontSize="48" FontWeight="Bold" FontFamily="Consolas" />
-          <TextBlock Text="{Binding ElapsedText}" FontSize="14" Foreground="{StaticResource MutedBrush}" />
+          <!-- Stato di PowerPoint/PptHost: solo se c'è un PPT in lista -->
+          <TextBlock Text="{Binding PptStatusText}" Margin="0,8,0,0" Opacity="0.75">
+            <TextBlock.Style>
+              <Style TargetType="TextBlock">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding HasPptItems}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
         </StackPanel>
-        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-          <DockPanel>
-            <Button DockPanel.Dock="Left" Content="{Binding PauseButtonText}" Command="{Binding TogglePauseCommand}"
-                    Width="90" Padding="0,8" />
-            <TextBlock DockPanel.Dock="Left" Text="Volume ora" VerticalAlignment="Center" Margin="14,0,0,0"
-                       ToolTip="Volume dal vivo: vale solo per questa riproduzione" />
-            <CheckBox DockPanel.Dock="Right" Content="Mute" IsChecked="{Binding IsMuted}" VerticalAlignment="Center" Margin="12,0,0,0" />
-            <TextBlock DockPanel.Dock="Right" Width="40" TextAlignment="Right" VerticalAlignment="Center"
-                       Text="{Binding Volume, StringFormat={}{0}%}" />
-            <Slider Minimum="0" Maximum="100" Value="{Binding Volume}" SmallChange="5" LargeChange="10"
-                    VerticalAlignment="Center" Margin="14,0,8,0" Focusable="False" />
-          </DockPanel>
-          <DockPanel Margin="0,10,0,0">
-            <Button DockPanel.Dock="Left" Content="&#9664;&#9664; 10 s" Command="{Binding SeekBackCommand}"
-                    Width="90" Padding="0,6" ToolTip="Indietro di 10 secondi" />
-            <Button DockPanel.Dock="Right" Content="10 s &#9654;&#9654;" Command="{Binding SeekForwardCommand}"
-                    Width="90" Padding="0,6" ToolTip="Avanti di 10 secondi" />
-            <Slider Minimum="0" Maximum="{Binding DurationSeconds}" Value="{Binding PositionSeconds}"
-                    IsMoveToPointEnabled="True" Focusable="False" VerticalAlignment="Center" Margin="14,0,14,0"
-                    PreviewMouseLeftButtonDown="OnScrubStart" PreviewMouseLeftButtonUp="OnScrubEnd"
-                    Thumb.DragStarted="OnScrubStart" Thumb.DragCompleted="OnScrubEnd"
-                    ToolTip="Trascina per scorrere il video (anche in pausa)" />
-          </DockPanel>
+
+        <Button DockPanel.Dock="Bottom" Content="Aggiungi file..." Click="OnAddFilesClick" Padding="14,6"
+                HorizontalAlignment="Left" Margin="0,8,0,0"
+                ToolTip="Copia i file nella cartella contenuti: compaiono in scaletta da soli" />
+
+        <ListBox x:Name="ScalettaList" ItemsSource="{Binding ItemsView}" SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
+                 ItemContainerStyle="{StaticResource ScalettaItem}" AllowDrop="True"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 PreviewMouseLeftButtonDown="OnListMouseDown" PreviewMouseMove="OnListMouseMove"
+                 DragOver="OnListDragOver" DragLeave="OnListDragLeave" Drop="OnListDrop">
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Width="88" Height="50" Background="#FF0F1115" CornerRadius="4">
+                  <Grid>
+                    <TextBlock Text="{Binding KindText}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="{StaticResource MutedBrush}" FontWeight="Bold" />
+                    <Image Source="{Binding ThumbnailPath, Converter={StaticResource Thumb}, ConverterParameter=176}"
+                           Stretch="Uniform" />
+                  </Grid>
+                </Border>
+
+                <StackPanel Grid.Column="1" Margin="12,0" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding DisplayName}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding Session}" FontSize="12" Foreground="{StaticResource MutedBrush}"
+                             TextTrimming="CharacterEllipsis" Style="{StaticResource HideWhenEmpty}" />
+                  <TextBlock Text="{Binding Speaker}" FontSize="12" TextTrimming="CharacterEllipsis"
+                             Style="{StaticResource HideWhenEmpty}" />
+                  <TextBlock Text="{Binding StatusText}" FontSize="11" FontWeight="Bold" Foreground="#FFFFB300"
+                             Style="{StaticResource HideWhenEmpty}" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                  <TextBlock Text="{Binding KindText}" FontSize="11" Foreground="{StaticResource MutedBrush}"
+                             HorizontalAlignment="Right" />
+                  <Ellipse Width="12" Height="12" Margin="0,5,0,0" HorizontalAlignment="Right"
+                           Fill="{Binding Preflight, Converter={StaticResource PreflightBrush}}"
+                           ToolTip="{Binding PreflightSummary}" />
+                </StackPanel>
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+
+      <!-- ============================ DESTRA ============================ -->
+      <Grid Grid.Column="2">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="*" MinHeight="200" />
+          <RowDefinition Height="12" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Preview: solo anteprima, mai per l'onda -->
+        <Border Grid.Row="0" Background="{StaticResource PanelBrush}" CornerRadius="8" Padding="12">
+          <Grid DataContext="{Binding Preview}">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <DockPanel Grid.Row="0" Margin="0,0,0,8">
+              <Ellipse DockPanel.Dock="Right" Width="14" Height="14" VerticalAlignment="Center"
+                       Fill="{Binding Status, Converter={StaticResource PreflightBrush}}" />
+              <StackPanel>
+                <TextBlock Text="PREVIEW" FontSize="11" Foreground="{StaticResource MutedBrush}" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding Title}" FontSize="17" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding Subtitle}" Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+            </DockPanel>
+
+            <Grid Grid.Row="1">
+              <Border Background="#FF0F1115" CornerRadius="4" />
+              <Image Source="{Binding Image}" Stretch="Uniform" Margin="2" />
+              <TextBlock Text="{Binding Placeholder}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                         Foreground="{StaticResource MutedBrush}" FontSize="15">
+                <TextBlock.Style>
+                  <Style TargetType="TextBlock">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding HasImage}" Value="True">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </TextBlock.Style>
+              </TextBlock>
+            </Grid>
+
+            <!-- Pagine del PDF -->
+            <ListBox Grid.Row="2" ItemsSource="{Binding Pages}" Margin="0,8,0,0" Height="150"
+                     ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+              <ListBox.Style>
+                <Style TargetType="ListBox" BasedOn="{StaticResource {x:Type ListBox}}">
+                  <Setter Property="Visibility" Value="Collapsed" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding HasPages}" Value="True">
+                      <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </ListBox.Style>
+              <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <VirtualizingStackPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+              </ListBox.ItemsPanel>
+              <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                  <Setter Property="Padding" Value="4" />
+                  <Setter Property="Focusable" Value="False" />
+                </Style>
+              </ListBox.ItemContainerStyle>
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <StackPanel Width="96">
+                    <Image Source="{Binding Image}" Height="100" Stretch="Uniform" />
+                    <TextBlock Text="{Binding Number}" HorizontalAlignment="Center" FontSize="12"
+                               Foreground="{StaticResource MutedBrush}" />
+                  </StackPanel>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+
+            <!-- Righe del pre-flight -->
+            <ScrollViewer Grid.Row="3" MaxHeight="110" Margin="0,8,0,0" VerticalScrollBarVisibility="Auto" Focusable="False">
+              <ItemsControl ItemsSource="{Binding Lines}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="13" Margin="0,1" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </Grid>
+        </Border>
+
+        <!-- Program (provvisorio fino alla M7): stato, pagina/slide, video, audio, GO, PANIC -->
+        <StackPanel Grid.Row="2">
+          <Border CornerRadius="10" MinHeight="84" Margin="0,0,0,10">
+            <Border.Style>
+              <Style TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource TappoBrush}" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding State}" Value="{x:Static core:WaveState.InOnda}">
+                    <Setter Property="Background" Value="{StaticResource OnAirBrush}" />
+                  </DataTrigger>
+                  <DataTrigger Binding="{Binding State}" Value="{x:Static core:WaveState.InTransizioneIn}">
+                    <Setter Property="Background" Value="{StaticResource TransitionBrush}" />
+                  </DataTrigger>
+                  <DataTrigger Binding="{Binding State}" Value="{x:Static core:WaveState.InTransizioneOut}">
+                    <Setter Property="Background" Value="{StaticResource TransitionBrush}" />
+                  </DataTrigger>
+                  <DataTrigger Binding="{Binding State}" Value="{x:Static core:WaveState.Caricamento}">
+                    <Setter Property="Background" Value="{StaticResource TransitionBrush}" />
+                  </DataTrigger>
+                  <DataTrigger Binding="{Binding State}" Value="{x:Static core:WaveState.Errore}">
+                    <Setter Property="Background" Value="{StaticResource ErrorBrush}" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </Border.Style>
+            <TextBlock Text="{Binding StateText}" FontSize="40" FontWeight="Bold" Foreground="White"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+
+          <!-- Pagina N/M per i PDF e frecce -->
+          <Grid Margin="0,0,0,10" Height="46">
+            <Grid.Style>
+              <Style TargetType="Grid">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding HasPage}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </Grid.Style>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="90" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="90" />
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="0" Content="&#9664;" Command="{Binding PreviousPageCommand}" FontSize="22" />
+            <TextBlock Grid.Column="1" Text="{Binding PageText}" FontSize="24" FontWeight="SemiBold"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <Button Grid.Column="2" Content="&#9654;" Command="{Binding NextPageCommand}" FontSize="22" />
+          </Grid>
+
+          <!-- Video in onda: countdown, play/pausa, volume, scorrimento -->
+          <Border Background="{StaticResource PanelBrush}" CornerRadius="8" Padding="14,10" Margin="0,0,0,10">
+            <Border.Style>
+              <Style TargetType="Border">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding IsVideoOnAir}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </Border.Style>
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0" Margin="0,0,24,0">
+                <TextBlock Text="{Binding RemainingText}" FontSize="44" FontWeight="Bold" FontFamily="Consolas" />
+                <TextBlock Text="{Binding ElapsedText}" FontSize="14" Foreground="{StaticResource MutedBrush}" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <DockPanel>
+                  <Button DockPanel.Dock="Left" Content="{Binding PauseButtonText}" Command="{Binding TogglePauseCommand}"
+                          Width="90" Padding="0,8" />
+                  <TextBlock DockPanel.Dock="Left" Text="Volume ora" VerticalAlignment="Center" Margin="14,0,0,0"
+                             ToolTip="Volume dal vivo: vale solo per questa riproduzione" />
+                  <CheckBox DockPanel.Dock="Right" Content="Mute" IsChecked="{Binding IsMuted}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                  <TextBlock DockPanel.Dock="Right" Width="40" TextAlignment="Right" VerticalAlignment="Center"
+                             Text="{Binding Volume, StringFormat={}{0}%}" />
+                  <Slider Minimum="0" Maximum="100" Value="{Binding Volume}" SmallChange="5" LargeChange="10"
+                          VerticalAlignment="Center" Margin="14,0,8,0" Focusable="False" />
+                </DockPanel>
+                <DockPanel Margin="0,10,0,0">
+                  <Button DockPanel.Dock="Left" Content="&#9664;&#9664; 10 s" Command="{Binding SeekBackCommand}"
+                          Width="90" Padding="0,6" ToolTip="Indietro di 10 secondi" />
+                  <Button DockPanel.Dock="Right" Content="10 s &#9654;&#9654;" Command="{Binding SeekForwardCommand}"
+                          Width="90" Padding="0,6" ToolTip="Avanti di 10 secondi" />
+                  <Slider Minimum="0" Maximum="{Binding DurationSeconds}" Value="{Binding PositionSeconds}"
+                          IsMoveToPointEnabled="True" Focusable="False" VerticalAlignment="Center" Margin="14,0,14,0"
+                          PreviewMouseLeftButtonDown="OnScrubStart" PreviewMouseLeftButtonUp="OnScrubEnd"
+                          Thumb.DragStarted="OnScrubStart" Thumb.DragCompleted="OnScrubEnd"
+                          ToolTip="Trascina per scorrere il video (anche in pausa)" />
+                </DockPanel>
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <!-- PowerPoint in onda: solo volume dal vivo e Mute -->
+          <Border Background="{StaticResource PanelBrush}" CornerRadius="8" Padding="14,10" Margin="0,0,0,10">
+            <Border.Style>
+              <Style TargetType="Border">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding IsSlideShowAudioOnAir}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </Border.Style>
+            <DockPanel>
+              <TextBlock DockPanel.Dock="Left" Text="Volume ora" VerticalAlignment="Center"
+                         ToolTip="Volume dal vivo dell'audio di PowerPoint: vale solo per questa messa in onda" />
+              <CheckBox DockPanel.Dock="Right" Content="Mute" IsChecked="{Binding IsMuted}" VerticalAlignment="Center" Margin="12,0,0,0" />
+              <TextBlock DockPanel.Dock="Right" Width="40" TextAlignment="Right" VerticalAlignment="Center"
+                         Text="{Binding Volume, StringFormat={}{0}%}" />
+              <Slider Minimum="0" Maximum="100" Value="{Binding Volume}" SmallChange="5" LargeChange="10"
+                      VerticalAlignment="Center" Margin="14,0,8,0" Focusable="False" />
+            </DockPanel>
+          </Border>
+
+          <Grid Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="14" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="0" Command="{Binding GoCommand}" Background="{StaticResource GoBrush}"
+                    FontSize="22" FontWeight="SemiBold" Padding="14,16">
+              <TextBlock Text="GO  (Spazio / Invio)" Foreground="White" />
+            </Button>
+            <Button Grid.Column="2" Command="{Binding BackToTappoCommand}" FontSize="22" Padding="14,16">
+              <TextBlock Text="TORNA AL TAPPO" Foreground="White" />
+            </Button>
+          </Grid>
+
+          <Button Command="{Binding PanicCommand}" Background="#FFB71C1C" Padding="14,22">
+            <TextBlock Text="PANIC  (Esc)" FontSize="32" FontWeight="Bold" Foreground="White" />
+          </Button>
         </StackPanel>
       </Grid>
-    </Border>
-
-    <!-- PowerPoint in onda: solo volume dal vivo e Mute (agiscono sulla sessione audio di POWERPNT.EXE) -->
-    <Border Background="{StaticResource PanelBrush}" CornerRadius="8" Padding="14,10" Margin="0,0,0,14">
-      <Border.Style>
-        <Style TargetType="Border">
-          <Setter Property="Visibility" Value="Collapsed" />
-          <Style.Triggers>
-            <DataTrigger Binding="{Binding IsSlideShowAudioOnAir}" Value="True">
-              <Setter Property="Visibility" Value="Visible" />
-            </DataTrigger>
-          </Style.Triggers>
-        </Style>
-      </Border.Style>
-      <DockPanel>
-        <TextBlock DockPanel.Dock="Left" Text="Volume ora" VerticalAlignment="Center"
-                   ToolTip="Volume dal vivo dell'audio di PowerPoint: vale solo per questa messa in onda" />
-        <CheckBox DockPanel.Dock="Right" Content="Mute" IsChecked="{Binding IsMuted}" VerticalAlignment="Center" Margin="12,0,0,0" />
-        <TextBlock DockPanel.Dock="Right" Width="40" TextAlignment="Right" VerticalAlignment="Center"
-                   Text="{Binding Volume, StringFormat={}{0}%}" />
-        <Slider Minimum="0" Maximum="100" Value="{Binding Volume}" SmallChange="5" LargeChange="10"
-                VerticalAlignment="Center" Margin="14,0,8,0" Focusable="False" />
-      </DockPanel>
-    </Border>
-    </StackPanel>
-
-    <Grid Grid.Row="6" Margin="0,0,0,14">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*" />
-        <ColumnDefinition Width="14" />
-        <ColumnDefinition Width="*" />
-      </Grid.ColumnDefinitions>
-      <Button Grid.Column="0" Command="{Binding GoCommand}" Background="{StaticResource GoBrush}"
-              FontSize="22" FontWeight="SemiBold" Padding="14,18">
-        <TextBlock Text="GO  (Spazio / Invio)" Foreground="White" />
-      </Button>
-      <Button Grid.Column="2" Command="{Binding BackToTappoCommand}" FontSize="22" Padding="14,18">
-        <TextBlock Text="TORNA AL TAPPO" Foreground="White" />
-      </Button>
     </Grid>
-
-    <Button Grid.Row="7" Command="{Binding PanicCommand}" Background="#FFB71C1C" Padding="14,26">
-      <TextBlock Text="PANIC  (Esc)" FontSize="34" FontWeight="Bold" Foreground="White" />
-    </Button>
   </Grid>
 </Window>

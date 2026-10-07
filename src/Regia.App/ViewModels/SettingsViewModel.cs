@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
@@ -50,6 +51,10 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private string _tappoPath = "";
+
+    /// <summary>Cartella contenuti collegata: i file che ci si mettono compaiono da soli in scaletta.</summary>
+    [ObservableProperty]
+    private string _sourceFolder = "";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PptAudioNote))]
@@ -106,6 +111,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         SimulationMode = current.SimulationMode;
         IsImageTappo = current.Tappo.Kind == TappoKind.Image;
         TappoPath = current.Tappo.Path;
+        SourceFolder = current.SourceFolder;
         FadeDurationMs = current.FadeDurationMs;
         HardCut = current.HardCut;
     }
@@ -144,6 +150,22 @@ public sealed partial class SettingsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void BrowseSourceFolder()
+    {
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Scegli la cartella dei contenuti dell'evento",
+            Multiselect = false
+        };
+
+        if (!string.IsNullOrWhiteSpace(SourceFolder) && Directory.Exists(SourceFolder))
+            dialog.InitialDirectory = SourceFolder;
+
+        if (dialog.ShowDialog() == true)
+            SourceFolder = dialog.FolderName;
+    }
+
+    [RelayCommand]
     private async Task ApplyAsync()
     {
         var settings = _current with
@@ -156,6 +178,7 @@ public sealed partial class SettingsViewModel : ObservableObject
                 Kind = IsImageTappo ? TappoKind.Image : TappoKind.Video,
                 Path = TappoPath?.Trim() ?? ""
             },
+            SourceFolder = SourceFolder?.Trim() ?? "",
             AudioDeviceId = SelectedAudioDevice?.Id ?? "",
             AudioDeviceName = SelectedAudioDevice?.Name ?? "",
             FadeDurationMs = (int)Math.Round(FadeDurationMs),

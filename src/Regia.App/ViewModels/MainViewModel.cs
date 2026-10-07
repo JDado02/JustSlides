@@ -1,7 +1,11 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Windows;
+using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Regia.App.Services;
+using Regia.Core.Show;
 using Regia.Core.Media;
 using Regia.Core.Settings;
 using Regia.Core.Wave;
@@ -16,14 +20,13 @@ using Serilog;
 namespace Regia.App.ViewModels;
 
 /// <summary>
-/// ViewModel della regia. Lo stato dell'onda vive in <see cref="WaveController"/> (Core): qui si
-/// espongono solo comandi e proprietà per la UI. La lista dei file è provvisoria (la scaletta vera
-/// arriva in M6): non viene salvata.
+/// ViewModel della regia. Lo stato dell'onda vive in <see cref="WaveController"/> (Core), la scaletta e il file
+/// show in <see cref="ShowController"/>: qui si espongono solo comandi e proprietà per la UI.
 /// </summary>
 public sealed partial class MainViewModel : ObservableObject
 {
     private readonly OutputHost _output;
-    private readonly SettingsStore _store;
+    private readonly ShowController _show;
     private readonly WaveController _wave;
     private readonly TappoTransitions _transitions;
     private readonly ContentPresenterFactory _factory;
@@ -44,6 +47,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSelectedVideo))]
+    [NotifyPropertyChangedFor(nameof(HasEditableSelection))]
+    [NotifyPropertyChangedFor(nameof(SelectedSession))]
     [NotifyPropertyChangedFor(nameof(IsSelectedAudio))]
     [NotifyPropertyChangedFor(nameof(EndReturnToTappo))]
     [NotifyPropertyChangedFor(nameof(EndHoldLastFrame))]
@@ -74,7 +79,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     public MainViewModel(
         OutputHost output,
-        SettingsStore store,
+        ShowController show,
+        PreviewViewModel preview,
         AppSettings settings,
         WaveController wave,
         TappoTransitions transitions,
@@ -82,17 +88,32 @@ public sealed partial class MainViewModel : ObservableObject
         PptHostClient ppt)
     {
         _output = output;
-        _store = store;
+        _show = show;
+        Preview = preview;
         _wave = wave;
         _transitions = transitions;
         _factory = factory;
         _ppt = ppt;
         Settings = settings;
 
-        Items.Add(MediaItem.TestPattern);
-        SelectedItem = Items[0];
+        ItemsView = CollectionViewSource.GetDefaultView(Items);
+        ItemsView.Filter = o => ShowExcluded || o is not MediaItem { Excluded: true };
+        if (ItemsView is ICollectionViewLiveShaping live && live.CanChangeLiveFiltering)
+        {
+            live.LiveFilteringProperties.Add(nameof(MediaItem.Excluded));
+            live.IsLiveFiltering = true;
+        }
 
-        _wave.StateChanged += (_, now) => State = now;
+        Items.CollectionChanged += OnItemsChanged;
+        _show.Sync.StatusChanged += () => OnUi(RefreshSourceStatus);
+        _show.SaveFailed += message => OnUi(() => Warning = message);
+        _show.SettingsReplaced += OnSettingsReplaced;
+
+        _wave.StateChanged += (_, now) =>
+        {
+            State = now;
+            _show.Sync.OnWaveChanged(); // esegue gli aggiornamenti/rimozioni rimandati dal file che era in onda
+        };
         _wave.PageChanged += OnPageChanged;
         _wave.PlaybackChanged += OnPlaybackChanged;
         _wave.ErrorOccurred += message => Warning = message;
@@ -149,7 +170,67 @@ public sealed partial class MainViewModel : ObservableObject
 
     public AppSettings Settings { get; private set; }
 
-    public ObservableCollection<MediaItem> Items { get; } = [];
+    public ObservableCollection<MediaItem> Items => _show.Scaletta.Items;
+
+    /// <summary>Vista della scaletta: nasconde le voci escluse (a meno di "Mostra esclusi").</summary>
+    public ICollectionView ItemsView { get; }
+
+    public PreviewViewModel Preview { get; }
+
+    [ObservableProperty]
+    private bool _showExcluded;
+
+    partial void OnShowExcludedChanged(bool value) => ItemsView.Refresh();
+
+    /// <summary>Messaggio sulla cartella contenuti (non configurata / non raggiungibile); vuoto se tutto bene.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSourceMessage))]
+    private string _sourceMessage = "";
+
+    public bool HasSourceMessage => SourceMessage.Length > 0;
+
+    /// <summary>Cartella irraggiungibile (rosso) invece che non configurata (arancione).</summary>
+    public bool SourceMessageIsError => _show.Sync.Status == SourceStatus.Unreachable;
+
+    public bool SourceNotConfigured => _show.Sync.Status == SourceStatus.NotConfigured;
+
+    /// <summary>Cartella collegata, per la barra in alto.</summary>
+    public string SourceLabel => string.IsNullOrWhiteSpace(Settings.SourceFolder)
+        ? "Cartella contenuti: non configurata"
+        : "Cartella contenuti: " + Settings.SourceFolder;
+
+    private void RefreshSourceStatus()
+    {
+        SourceMessage = _show.Sync.StatusMessage;
+        OnPropertyChanged(nameof(SourceMessageIsError));
+        OnPropertyChanged(nameof(SourceNotConfigured));
+        OnPropertyChanged(nameof(SourceLabel));
+    }
+
+    private void OnItemsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        OnPropertyChanged(nameof(HasPptItems));
+        RefreshAudioDeviceWarning();
+
+        // La voce selezionata è sparita (file tolto dalla cartella): si passa a una vicina.
+        if (SelectedItem is not null && !Items.Contains(SelectedItem))
+        {
+            var index = e.OldStartingIndex < 0 ? 1 : Math.Max(1, e.OldStartingIndex);
+            SelectedItem = Items.Count > 1 ? Items[Math.Min(index, Items.Count - 1)] : Items.FirstOrDefault();
+        }
+
+        // PowerPoint ci mette qualche secondo ad avviarsi: lo si prepara appena compare un PPT, così il GO è rapido.
+        if (e.NewItems is not null && e.NewItems.OfType<MediaItem>().Any(i => i.Kind == MediaKind.Ppt))
+            PrewarmPowerPoint();
+    }
+
+    private void PrewarmPowerPoint()
+    {
+        if (_ppt.ForeignPowerPointRunning)
+            Warning = PptHostClient.ForeignInstanceMessage;
+        else
+            _ppt.Prewarm();
+    }
 
     public bool HasWarning => !string.IsNullOrEmpty(Warning);
 
@@ -173,6 +254,34 @@ public sealed partial class MainViewModel : ObservableObject
     public string ElapsedText => _wave.Progress is { } p ? $"{FormatTime(p.Elapsed)} / {FormatTime(p.Duration)}" : "";
 
     public string PauseButtonText => _wave.IsPaused ? "PLAY" : "PAUSA";
+
+    partial void OnSelectedItemChanged(MediaItem? value)
+    {
+        // "AGGIORNATO" resta finché l'operatore non guarda la voce.
+        if (value is { IsUpdated: true })
+            value.IsUpdated = false;
+
+        _show.NoteSelection(value);
+        Preview.Show(value);
+    }
+
+    /// <summary>Una voce vera (non la schermata di prova): sessione e relatore sono modificabili.</summary>
+    public bool HasEditableSelection => SelectedItem is { IsFixed: false };
+
+    /// <summary>Sessione della voce selezionata; scriverla a mano la rende definitiva (la scansione non la riscrive).</summary>
+    public string SelectedSession
+    {
+        get => SelectedItem?.Session ?? "";
+        set
+        {
+            if (SelectedItem is not { IsFixed: false } item || item.Session == value)
+                return;
+
+            item.Session = value;
+            item.SessionEdited = true;
+            OnPropertyChanged();
+        }
+    }
 
     public bool IsSelectedVideo => SelectedItem?.Kind == MediaKind.Video;
 
@@ -236,70 +345,81 @@ public sealed partial class MainViewModel : ObservableObject
     {
         await ApplyOutputAsync();
         RefreshAudioDeviceWarning();
+        RefreshSourceStatus();
+
+        SelectedItem = _show.RestoredSelection ?? Items.FirstOrDefault();
     }
 
-    /// <summary>Aggiunge file alla lista provvisoria; quelli non gestiti vengono scartati con un avviso.</summary>
-    public void AddFiles(IEnumerable<string> paths)
+    /// <summary>
+    /// "Aggiungi file": copia i file nella cartella collegata (una sola fonte di verità); li trova la scansione.
+    /// </summary>
+    public async Task AddFilesAsync(IEnumerable<string> paths)
     {
-        var rejected = new List<string>();
-        var anyPpt = false;
-
-        foreach (var path in paths)
-        {
-            var item = MediaItem.FromPath(path);
-            if (item.Kind is MediaKind.Image or MediaKind.Pdf or MediaKind.Video or MediaKind.Ppt)
-            {
-                Items.Add(item);
-                SelectedItem = item;
-                Log.Information("File aggiunto alla lista: {Path} ({Kind})", path, item.Kind);
-
-                if (item.Kind == MediaKind.Ppt)
-                    anyPpt = true;
-            }
-            else
-            {
-                rejected.Add(item.DisplayName);
-                Log.Warning("File non supportato in questa versione: {Path} ({Kind})", path, item.Kind);
-            }
-        }
-
-        if (rejected.Count > 0)
-            Warning = "File non supportati (per ora solo JPG, PNG, PDF, video e PowerPoint): " + string.Join(", ", rejected);
-
-        if (anyPpt)
-        {
-            OnPropertyChanged(nameof(HasPptItems));
-            RefreshAudioDeviceWarning();
-
-            // PowerPoint ci mette qualche secondo ad avviarsi: lo si prepara subito, così il GO è rapido.
-            if (_ppt.ForeignPowerPointRunning)
-                Warning = PptHostClient.ForeignInstanceMessage;
-            else
-                _ppt.Prewarm();
-        }
+        var errors = await _show.Sync.CopyIntoFolderAsync(paths);
+        if (errors.Count > 0)
+            Warning = "Impossibile aggiungere: " + string.Join("; ", errors);
     }
 
+    /// <summary>Riordino per trascinamento: sposta <paramref name="item"/> prima o dopo <paramref name="target"/>.</summary>
+    public void MoveItem(MediaItem item, MediaItem target, bool after)
+    {
+        if (_show.Scaletta.Move(item, target, after))
+            Log.Information("Scaletta: {Item} spostato {Where} {Target}", item.DisplayName, after ? "dopo" : "prima di", target.DisplayName);
+    }
+
+    /// <summary>Nasconde/mostra la voce selezionata (la cartella non si tocca). Il file in onda non si nasconde.</summary>
     [RelayCommand]
-    private void RemoveSelected()
+    private void ToggleExcludeSelected()
     {
-        if (SelectedItem is null || SelectedItem.Kind == MediaKind.TestPattern)
+        if (SelectedItem is not { IsFixed: false } item)
             return;
 
-        // Il file in onda non si toglie dalla lista: la regia lo sta ancora usando.
-        if (ReferenceEquals(SelectedItem, _wave.CurrentItem))
+        if (!item.Excluded && ReferenceEquals(item, _wave.CurrentItem))
         {
-            Log.Warning("Rimozione rifiutata: {Item} è in onda", SelectedItem.DisplayName);
-            MessageBox.Show(Application.Current?.MainWindow!,
-                $"\"{SelectedItem.DisplayName}\" è in onda e non può essere rimosso.\n\nRiporta prima la regia al Tappo, poi rimuovilo.",
-                "Contenuto in onda", MessageBoxButton.OK, MessageBoxImage.Warning);
+            Warning = $"\"{item.DisplayName}\" è in onda: riporta prima la regia al Tappo.";
             return;
         }
 
-        var index = Items.IndexOf(SelectedItem);
-        Items.Remove(SelectedItem);
-        SelectedItem = Items.Count > 0 ? Items[Math.Min(index, Items.Count - 1)] : null;
-        OnPropertyChanged(nameof(HasPptItems));
-        RefreshAudioDeviceWarning();
+        item.Excluded = !item.Excluded;
+        Log.Information("Voce {Item}: {State}", item.DisplayName, item.Excluded ? "esclusa dalla scaletta" : "di nuovo in scaletta");
+    }
+
+    /// <summary>"Nuovo evento": archivia lo show e riparte da zero (scaletta, impostazioni, cartella). Solo a Tappo.</summary>
+    [RelayCommand]
+    private void NewEvent()
+    {
+        if (State is not (WaveState.Tappo or WaveState.Errore))
+        {
+            Warning = "Nuovo evento: riporta prima la regia al Tappo.";
+            return;
+        }
+
+        var answer = MessageBox.Show(Application.Current?.MainWindow!,
+            "Iniziare un nuovo evento?\n\nLa scaletta, le impostazioni dell'evento (monitor, Tappo, audio, dissolvenza) e il " +
+            "collegamento alla cartella contenuti vengono azzerati. Le copie locali dei file vengono cancellate; " +
+            "i file nella cartella contenuti non vengono toccati.",
+            "Nuovo evento", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel);
+        if (answer != MessageBoxResult.OK)
+            return;
+
+        Log.Information("Nuovo evento richiesto dall'operatore");
+        SelectedItem = null;
+        _show.NewEvent();
+        SelectedItem = Items.FirstOrDefault();
+        RefreshSourceStatus();
+    }
+
+    private async void OnSettingsReplaced(AppSettings settings)
+    {
+        try
+        {
+            await ApplyAppliedSettingsAsync(settings);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Impossibile applicare le impostazioni del nuovo evento");
+            Warning = "Impossibile applicare le impostazioni: " + ex.Message;
+        }
     }
 
     [RelayCommand]
@@ -311,9 +431,24 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
+        if (!SelectedItem.CanGoOnAir)
+        {
+            Warning = GoRefusedMessage(SelectedItem);
+            Log.Warning("GO rifiutato: {Message}", Warning);
+            return;
+        }
+
         Warning = _output.Warning;
         await _wave.GoAsync(SelectedItem);
     }
+
+    private static string GoRefusedMessage(MediaItem item) => item.CopyState switch
+    {
+        CopyState.Copying => $"\"{item.DisplayName}\" non è ancora pronto: copia in corso ({item.CopyProgress}%).",
+        CopyState.Failed => $"\"{item.DisplayName}\": copia non riuscita ({item.StatusDetail}).",
+        CopyState.Unsupported => $"\"{item.DisplayName}\": tipo di file non supportato.",
+        _ => $"\"{item.DisplayName}\" ha un errore nel controllo: {item.PreflightSummary}."
+    };
 
     [RelayCommand]
     private async Task BackToTappoAsync()
@@ -492,23 +627,22 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Salva e applica le nuove impostazioni. Restituisce l'eventuale avviso per l'operatore.</summary>
     private async Task<string?> ApplySettingsAsync(AppSettings settings)
     {
+        await ApplyAppliedSettingsAsync(settings, persist: true);
+        return _output.Warning;
+    }
+
+    private async Task ApplyAppliedSettingsAsync(AppSettings settings, bool persist = false)
+    {
         Settings = settings.Normalize();
         _transitions.Settings = Settings;
         _factory.Settings = Settings;
+        _ppt.Settings = Settings;
+        if (persist)
+            _show.UpdateSettings(Settings);
+
         RefreshAudioDeviceWarning();
-
-        try
-        {
-            _store.Save(Settings);
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Impossibile salvare le impostazioni");
-            Warning = "Impossibile salvare le impostazioni: " + ex.Message;
-        }
-
+        RefreshSourceStatus();
         await ApplyOutputAsync();
-        return _output.Warning;
     }
 
     private async Task ApplyOutputAsync()

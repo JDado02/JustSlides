@@ -91,6 +91,8 @@ public sealed class PptHostClient : IDisposable
     public event Action? StatusChanged;
 
     /// <summary>Esiste un POWERPNT.EXE che non abbiamo avviato noi (di norma aperto dall'utente).</summary>
+    private bool _prewarmInFlight;
+
     public bool ForeignPowerPointRunning
     {
         get
@@ -127,6 +129,16 @@ public sealed class PptHostClient : IDisposable
         if (_disposed)
             return;
 
+        // Già in avvio o in funzione (più PPT in lista fanno più richieste): la seconda richiesta vedrebbe il
+        // POWERPNT appena lanciato da noi prima che sia registrato e lo scambierebbe per quello dell'utente.
+        lock (_gate)
+        {
+            if (_prewarmInFlight)
+                return;
+
+            _prewarmInFlight = true;
+        }
+
         _ = Task.Run(async () =>
         {
             try
@@ -141,6 +153,11 @@ public sealed class PptHostClient : IDisposable
             {
                 Log.Warning(ex, "Pre-avvio di PowerPoint non riuscito");
                 Warning?.Invoke("PowerPoint non è partito: " + ex.Message);
+            }
+            finally
+            {
+                lock (_gate)
+                    _prewarmInFlight = false;
             }
         });
     }

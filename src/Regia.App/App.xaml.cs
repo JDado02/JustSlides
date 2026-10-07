@@ -3,14 +3,18 @@ using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Regia.App.Services;
 using Regia.App.ViewModels;
 using Regia.Core.Logging;
+using Regia.Core.Media;
 using Regia.Core.Settings;
+using Regia.Core.Show;
 using Regia.Core.Wave;
 using Regia.Output;
 using Regia.Output.Content;
 using Regia.Output.Interop;
 using Regia.Output.Ppt;
+using Regia.Output.Preflight;
 using Regia.Output.Tappo;
 using Regia.Output.Transitions;
 using Serilog;
@@ -45,15 +49,20 @@ public partial class App : Application
             RegisterGlobalHandlers();
             SystemIntegration.PreventSleep();
 
-            var store = new SettingsStore(SettingsStore.DefaultPath);
-            var settings = store.Load();
+            // Lo show contiene scaletta e impostazioni dell'evento; al primo avvio dopo M5 le impostazioni
+            // vengono prese dal vecchio settings.json.
+            var showStore = new ShowStore(ShowStore.DefaultPath, SettingsStore.DefaultPath);
+            var show = showStore.Load();
+            var settings = show.Settings;
 
             _host = Host.CreateDefaultBuilder()
                 .UseSerilog(Log.Logger)
                 .ConfigureServices(services =>
                 {
-                    services.AddSingleton(store);
+                    services.AddSingleton(showStore);
+                    services.AddSingleton(show);
                     services.AddSingleton(settings);
+                    services.AddSingleton<Scaletta>();
                     services.AddSingleton<VlcService>();
                     services.AddSingleton<PptHostClient>();
                     services.AddSingleton<OutputHost>();
@@ -63,6 +72,18 @@ public partial class App : Application
                     services.AddSingleton<ContentPresenterFactory>();
                     services.AddSingleton<IContentPresenterFactory>(sp => sp.GetRequiredService<ContentPresenterFactory>());
                     services.AddSingleton<WaveController>();
+                    services.AddSingleton(sp =>
+                    {
+                        var wave = sp.GetRequiredService<WaveController>();
+                        return new PreflightService(sp.GetRequiredService<VlcService>(), () => PreflightLoadFor(wave));
+                    });
+                    services.AddSingleton(sp =>
+                    {
+                        var wave = sp.GetRequiredService<WaveController>();
+                        return new SourceFolderSync(sp.GetRequiredService<Scaletta>(), () => wave.CurrentItem, () => IsCritical(wave));
+                    });
+                    services.AddSingleton<ShowController>();
+                    services.AddSingleton<PreviewViewModel>();
                     services.AddSingleton<MainViewModel>();
                     services.AddSingleton<MainWindow>();
                 })
@@ -74,6 +95,7 @@ public partial class App : Application
             await _host.StartAsync();
 
             _viewModel = _host.Services.GetRequiredService<MainViewModel>();
+            _host.Services.GetRequiredService<ShowController>().Start();
             _mainWindow = _host.Services.GetRequiredService<MainWindow>();
             MainWindow = _mainWindow;
             _mainWindow.Show();
@@ -97,6 +119,7 @@ public partial class App : Application
         try
         {
             Log.Information("=== Chiusura Regia ===");
+            _host?.Services.GetService<ShowController>()?.Dispose(); // ultimo salvataggio dello show
             _host?.Services.GetService<PptHostClient>()?.Dispose();
             _host?.Services.GetService<OutputHost>()?.Dispose();
             _host?.Services.GetService<VlcService>()?.Dispose();
@@ -123,6 +146,19 @@ public partial class App : Application
         }
 
         base.OnExit(e);
+    }
+
+    /// <summary>Caricamento e dissolvenze: niente I/O pesante (copie, pre-flight).</summary>
+    private static bool IsCritical(WaveController wave) =>
+        wave.State is WaveState.Caricamento or WaveState.InTransizioneIn or WaveState.InTransizioneOut;
+
+    /// <summary>Quanto pre-flight si può fare ora: i video (VLC) non mentre un video o un PowerPoint sono in onda.</summary>
+    private static PreflightLoad PreflightLoadFor(WaveController wave)
+    {
+        if (IsCritical(wave))
+            return PreflightLoad.None;
+
+        return wave.CurrentItem is { Kind: MediaKind.Video or MediaKind.Ppt } ? PreflightLoad.Light : PreflightLoad.Full;
     }
 
     /// <summary>Handler globali: log + ritorno al Tappo, mai chiusura silenziosa.</summary>

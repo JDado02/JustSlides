@@ -46,12 +46,16 @@ public sealed record AppSettings
     /// <summary>Tempo massimo per aprire una presentazione (file grandi o su disco lento).</summary>
     public int PptOpenTimeoutMs { get; init; } = 30000;
 
+    /// <summary>Cartella collegata: i file che ci si mettono compaiono da soli in scaletta. Vuoto = non configurata.</summary>
+    public string SourceFolder { get; init; } = "";
+
     /// <summary>Riporta i valori entro i limiti ammessi.</summary>
     public AppSettings Normalize() => this with
     {
         FadeDurationMs = Math.Clamp(FadeDurationMs, MinFadeMs, MaxFadeMs),
         PptHostTimeoutMs = Math.Max(PptHostTimeoutMs, 500),
         PptOpenTimeoutMs = Math.Max(PptOpenTimeoutMs, 5000),
-        Tappo = Tappo ?? new TappoSettings()
+        Tappo = Tappo ?? new TappoSettings(),
+        SourceFolder = SourceFolder?.Trim() ?? ""
     };
 }

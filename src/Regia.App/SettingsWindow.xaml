@@ -35,6 +35,14 @@
         <CheckBox Margin="0,18,0,0" IsChecked="{Binding SimulationMode}"
                   Content="Modalità simulazione (output in una finestra sul monitor principale)" />
 
+        <TextBlock Text="Cartella contenuti" FontSize="16" FontWeight="SemiBold" Margin="0,22,0,6" />
+        <DockPanel>
+          <Button DockPanel.Dock="Right" Content="Sfoglia..." Margin="8,0,0,0" Command="{Binding BrowseSourceFolderCommand}" />
+          <TextBox Text="{Binding SourceFolder, UpdateSourceTrigger=PropertyChanged}" />
+        </DockPanel>
+        <TextBlock Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,0"
+                   Text="I file messi qui (anche nelle sottocartelle, che diventano le sessioni) compaiono da soli in scaletta. La regia lavora sempre su una copia locale: la cartella può stare in rete o su chiavetta." />
+
         <TextBlock Text="Tappo" FontSize="16" FontWeight="SemiBold" Margin="0,22,0,6" />
         <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
           <RadioButton Content="Immagine" IsChecked="{Binding IsImageTappo}" GroupName="TappoKind" />
