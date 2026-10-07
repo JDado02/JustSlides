@@ -43,11 +43,15 @@ public sealed record AppSettings
     /// <summary>Timeout heartbeat verso PptHost (usato dalla Milestone 4).</summary>
     public int PptHostTimeoutMs { get; init; } = 3000;
 
+    /// <summary>Tempo massimo per aprire una presentazione (file grandi o su disco lento).</summary>
+    public int PptOpenTimeoutMs { get; init; } = 30000;
+
     /// <summary>Riporta i valori entro i limiti ammessi.</summary>
     public AppSettings Normalize() => this with
     {
         FadeDurationMs = Math.Clamp(FadeDurationMs, MinFadeMs, MaxFadeMs),
         PptHostTimeoutMs = Math.Max(PptHostTimeoutMs, 500),
+        PptOpenTimeoutMs = Math.Max(PptOpenTimeoutMs, 5000),
         Tappo = Tappo ?? new TappoSettings()
     };
 }

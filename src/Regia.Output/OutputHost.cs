@@ -27,6 +27,7 @@ public sealed class OutputHost : IDisposable
     private ITappoSource? _tappoSource;
     private int _tappoLoadVersion;
     private bool _shown;
+    private nint _showWindow;
 
     public OutputHost(VlcService vlc)
     {
@@ -199,13 +200,95 @@ public sealed class OutputHost : IDisposable
         _shown = true;
     }
 
-    /// <summary>Riporta il Tappo sopra a tutto (es. dopo che PowerPoint si è portato in primo piano).</summary>
+    /// <summary>
+    /// Riporta il Tappo sopra a tutto (es. dopo che PowerPoint si è portato in primo piano). In simulazione le finestre
+    /// non sono topmost: <c>NOTOPMOST</c> su una finestra già non-topmost non cambia l'ordine, serve <c>HWND_TOP</c>.
+    /// </summary>
     public void EnsureTopmost()
     {
         if (!_shown)
             return;
 
-        Tappo.Placement.Set(CurrentRect(), Mode == OutputMode.Real ? ZOrder.Topmost : ZOrder.NotTopmost);
+        // Con uno slideshow di PowerPoint il Tappo è sempre topmost (anche in simulazione): lo slideshow non lo è e non si può
+        // alzare da fuori, quindi è il Tappo a stargli sopra per costruzione.
+        var topmost = Mode == OutputMode.Real || _showWindow != 0;
+        Tappo.Placement.Set(CurrentRect(), topmost ? ZOrder.Topmost : ZOrder.Top);
+
+        // In simulazione la cornice (nera) e la finestra Contenuto non devono coprire lo slideshow: si mettono dietro di lui.
+        // Serve ripeterlo a ogni attivazione della regia, che alza la sua catena di finestre.
+        if (_showWindow != 0 && Mode == OutputMode.Simulation && _simulation is not null)
+            WindowPlacement.PlaceBehind(_simulation, _showWindow);
+    }
+
+    /// <summary>
+    /// Uno slideshow PowerPoint (finestra di un altro processo, non topmost e non controllabile nello z-order) sta sotto il Tappo.
+    /// La finestra Contenuto non può essere sopra di lui: si riduce a 1×1 e smette di essere topmost (il Tappo, suo "posseduto",
+    /// resta topmost e a pieno schermo), così lo slideshow è visibile quando il Tappo sfuma.
+    /// </summary>
+    public void AttachShowWindow(long hwnd)
+    {
+        _showWindow = (nint)hwnd;
+        Log.Information("Slideshow sotto il Tappo (finestra 0x{Hwnd:X})", hwnd);
+        if (!_shown)
+            return;
+
+        // In simulazione la cornice possiede Contenuto (che possiede il Tappo) e spostare un proprietario muove tutto il gruppo:
+        // per metterla dietro lo slideshow si scioglie il legame cornice→Contenuto finché lo slideshow c'è.
+        if (Mode == OutputMode.Simulation)
+            WindowPlacement.SetOwner(Content, null);
+
+        var rect = CurrentRect();
+        Content.Placement.Set(new PixelRect(rect.X, rect.Y, 1, 1), ZOrder.NotTopmost);
+        EnsureTopmost();
+    }
+
+    /// <summary>Lo slideshow è finito: la finestra Contenuto torna a pieno schermo e il Tappo sopra di lei.</summary>
+    public void DetachShowWindow()
+    {
+        if (_showWindow == 0)
+            return;
+
+        _showWindow = 0;
+        if (!_shown)
+            return;
+
+        var rect = CurrentRect();
+        if (Mode == OutputMode.Real)
+        {
+            Content.Placement.Set(rect, ZOrder.Topmost);
+            Tappo.Placement.Set(rect, ZOrder.Topmost);
+        }
+        else
+        {
+            // Il Tappo smette di essere topmost (NOTOPMOST agisce solo se lo era), si ripristina il legame cornice→Contenuto
+            // e la cornice rimette tutto a posto.
+            Tappo.Placement.Set(rect, ZOrder.NotTopmost);
+            if (_simulation is not null)
+                WindowPlacement.SetOwner(Content, _simulation);
+            LayoutSimulation();
+        }
+    }
+
+    /// <summary>
+    /// Finché il valore restituito non viene eliminato, il Tappo viene riportato in cima a ogni cambio di finestra in primo
+    /// piano. Da usare mentre uno slideshow di PowerPoint (altro processo) è sotto il Tappo.
+    /// </summary>
+    public IDisposable GuardTappoOnTop()
+    {
+        EnsureTopmost();
+        return new ForegroundWatcher(EnsureTopmost, Tappo.Dispatcher);
+    }
+
+    /// <summary>
+    /// Dove far partire lo slideshow PowerPoint: schermo intero sul monitor di output (con il nome GDI per la chiave
+    /// DisplayMonitor), oppure finestra senza cornice nella cornice di simulazione.
+    /// </summary>
+    public (PixelRect Rect, string? GdiDeviceName, bool Windowed) GetShowPlacement()
+    {
+        if (Mode == OutputMode.Real && CurrentMonitor is { } monitor)
+            return (PixelRect.FromMonitor(monitor), monitor.GdiDeviceName, false);
+
+        return (CurrentRect(), null, true);
     }
 
     private PixelRect CurrentRect()

@@ -11,9 +11,23 @@
   <ItemGroup>
     <ProjectReference Include="..\Regia.Core\Regia.Core.csproj" />
     <ProjectReference Include="..\Regia.Output\Regia.Output.csproj" />
+    <!-- PptHost è un exe separato: si compila prima, poi lo si copia accanto a Regia.App.exe (vedi CopyPptHost) -->
+    <ProjectReference Include="..\Regia.PptHost\Regia.PptHost.csproj" ReferenceOutputAssembly="false" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Serilog.Extensions.Hosting" />
     <PackageReference Include="Serilog.Sinks.File" />
   </ItemGroup>
+
+  <!-- Copia l'uscita di PptHost (exe, dll, runtimeconfig, deps) accanto a Regia.App.exe. Le dll in comune (Regia.Core, Serilog) sono le stesse. -->
+  <Target Name="CopyPptHost" AfterTargets="Build">
+    <PropertyGroup>
+      <PptHostOutDir>$(MSBuildThisFileDirectory)..\Regia.PptHost\bin\$(Configuration)\$(TargetFramework)\$(RuntimeIdentifier)\</PptHostOutDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <PptHostFile Include="$(PptHostOutDir)Regia.PptHost.*" />
+    </ItemGroup>
+    <Error Condition="'@(PptHostFile)' == ''" Text="Regia.PptHost non trovato in $(PptHostOutDir)" />
+    <Copy SourceFiles="@(PptHostFile)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

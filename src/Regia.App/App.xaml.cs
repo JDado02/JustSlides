@@ -10,6 +10,7 @@ using Regia.Core.Wave;
 using Regia.Output;
 using Regia.Output.Content;
 using Regia.Output.Interop;
+using Regia.Output.Ppt;
 using Regia.Output.Tappo;
 using Regia.Output.Transitions;
 using Serilog;
@@ -54,6 +55,7 @@ public partial class App : Application
                     services.AddSingleton(store);
                     services.AddSingleton(settings);
                     services.AddSingleton<VlcService>();
+                    services.AddSingleton<PptHostClient>();
                     services.AddSingleton<OutputHost>();
                     services.AddSingleton<WaveStateMachine>();
                     services.AddSingleton<TappoTransitions>();
@@ -65,6 +67,9 @@ public partial class App : Application
                     services.AddSingleton<MainWindow>();
                 })
                 .Build();
+
+            // PptHost/PowerPoint rimasti da un crash precedente (solo se sono davvero nostri).
+            _host.Services.GetRequiredService<PptHostClient>().CleanupOrphans();
 
             await _host.StartAsync();
 
@@ -92,6 +97,7 @@ public partial class App : Application
         try
         {
             Log.Information("=== Chiusura Regia ===");
+            _host?.Services.GetService<PptHostClient>()?.Dispose();
             _host?.Services.GetService<OutputHost>()?.Dispose();
             _host?.Services.GetService<VlcService>()?.Dispose();
             _host?.StopAsync(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult();

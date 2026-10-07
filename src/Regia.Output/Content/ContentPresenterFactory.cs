@@ -2,6 +2,7 @@ using Regia.Core.Media;
 using Regia.Core.Settings;
 using Regia.Core.Wave;
 using Regia.Output.Audio;
+using Regia.Output.Ppt;
 using Regia.Output.Tappo;
 using Serilog;
 
@@ -12,16 +13,28 @@ public sealed class ContentPresenterFactory : IContentPresenterFactory
 {
     private readonly OutputHost _output;
     private readonly VlcService _vlc;
+    private readonly PptHostClient _ppt;
+    private AppSettings _settings;
 
-    public ContentPresenterFactory(OutputHost output, VlcService vlc, AppSettings settings)
+    public ContentPresenterFactory(OutputHost output, VlcService vlc, PptHostClient ppt, AppSettings settings)
     {
         _output = output;
         _vlc = vlc;
-        Settings = settings;
+        _ppt = ppt;
+        _settings = settings;
+        _ppt.Settings = settings;
     }
 
-    /// <summary>Impostazioni correnti (dispositivo audio): vanno aggiornate quando l'operatore le cambia.</summary>
-    public AppSettings Settings { get; set; }
+    /// <summary>Impostazioni correnti (dispositivo audio, timeout di PptHost): vanno aggiornate quando l'operatore le cambia.</summary>
+    public AppSettings Settings
+    {
+        get => _settings;
+        set
+        {
+            _settings = value;
+            _ppt.Settings = value;
+        }
+    }
 
     /// <summary>Avviso per l'operatore (es. dispositivo audio scelto non collegato).</summary>
     public event Action<string>? Warning;
@@ -36,9 +49,19 @@ public sealed class ContentPresenterFactory : IContentPresenterFactory
             MediaKind.Image => new ImagePresenter(_output.Content, item.Path, size),
             MediaKind.Pdf => new PdfPresenter(_output.Content, item.Path, size),
             MediaKind.Video => new VideoPresenter(_output.Content, _vlc, item.Path, item.VideoEnd, ResolveAudioDevice()),
-            MediaKind.Ppt => throw new NotSupportedException("PowerPoint non è ancora gestito (Milestone 4)"),
+            MediaKind.Ppt => CreatePpt(item),
             _ => throw new NotSupportedException("Tipo di file non supportato")
         };
+    }
+
+    private PptPresenter CreatePpt(MediaItem item)
+    {
+        // PowerPoint è a istanza singola: se c'è già quello dell'utente la regia non ci si aggancia (rischio di chiuderlo o di
+        // lasciare i suoi file in mano al watchdog). Il GO viene rifiutato con un messaggio chiaro.
+        if (_ppt.ForeignPowerPointRunning)
+            throw new InvalidOperationException(PptHostClient.ForeignInstanceMessage);
+
+        return new PptPresenter(_ppt, _output, item.Path);
     }
 
     /// <summary>ID del dispositivo scelto se è ancora collegato, altrimenti null (predefinito di Windows) con avviso.</summary>

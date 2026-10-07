@@ -48,10 +48,31 @@ public readonly record struct PlaybackProgress(TimeSpan Elapsed, TimeSpan Durati
 }
 
 /// <summary>
-/// Contenuto a riproduzione continua (video). Il controller lo riconosce con <c>is</c>: immagini e PDF
-/// non lo implementano. Gli eventi vanno sollevati sul thread UI e mai dopo <see cref="IContentPresenter.Close"/>.
+/// Contenuto "vivo" che può finire o rompersi da solo (video, slideshow): il controller lo riconosce con <c>is</c>.
+/// Gli eventi vanno sollevati sul thread UI e mai dopo <see cref="IContentPresenter.Close"/>.
 /// </summary>
-public interface IPlaybackContent : IContentPresenter
+public interface ILiveContent : IContentPresenter
+{
+    /// <summary>Il contenuto è finito (fine video, ultima slide superata) e va ripreso il Tappo.</summary>
+    event Action? EndRequested;
+
+    /// <summary>Il player/host è andato in errore durante la proiezione.</summary>
+    event Action<Exception>? Faulted;
+}
+
+/// <summary>
+/// Slideshow PowerPoint pilotato da PptHost. <see cref="IContentPresenter.Next"/> e <see cref="IContentPresenter.Previous"/>
+/// non bloccano mai: il comando parte in background e la pagina si aggiorna con <see cref="IContentPresenter.PageChanged"/>.
+/// </summary>
+public interface ISlideShowContent : ILiveContent
+{
+}
+
+/// <summary>
+/// Contenuto a riproduzione continua (video). Il controller lo riconosce con <c>is</c>: immagini e PDF
+/// non lo implementano.
+/// </summary>
+public interface IPlaybackContent : ILiveContent
 {
     /// <summary>Fa partire la riproduzione (dopo <see cref="IContentPresenter.LoadAsync"/>, all'inizio della dissolvenza in entrata).</summary>
     void BeginPlayback();
@@ -77,11 +98,6 @@ public interface IPlaybackContent : IContentPresenter
     /// <summary>Aggiornamento di tempo trascorso / rimanente (pochi al secondo).</summary>
     event Action? ProgressChanged;
 
-    /// <summary>Il video è finito e l'azione di fine chiede di tornare al Tappo.</summary>
-    event Action? EndRequested;
-
-    /// <summary>Il player è andato in errore durante la riproduzione.</summary>
-    event Action<Exception>? Faulted;
 }
 
 public interface IContentPresenterFactory

@@ -136,10 +136,44 @@ public class WaveControllerTests
         }
     }
 
+    private sealed class FakeSlideShow(List<string> log, string name) : ISlideShowContent
+    {
+        public int CloseCount { get; private set; }
+        public int NextCount { get; private set; }
+        public PageInfo? Page { get; private set; } = new(1, 5);
+
+        public event Action? PageChanged;
+        public event Action? EndRequested;
+        public event Action<Exception>? Faulted;
+
+        public Task LoadAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public bool Next()
+        {
+            NextCount++;
+            Page = new PageInfo(Math.Min(Page!.Value.Current + 1, 5), 5);
+            PageChanged?.Invoke();
+            return true;
+        }
+
+        public bool Previous() => true;
+
+        public void Close()
+        {
+            CloseCount++;
+            log.Add("close:" + name);
+        }
+
+        public void RaiseEnd() => EndRequested?.Invoke();
+
+        public void RaiseFault(Exception ex) => Faulted?.Invoke(ex);
+    }
+
     private sealed class FakeFactory(FakeTappo tappo) : IContentPresenterFactory
     {
         public Dictionary<string, FakePresenter> Presenters { get; } = [];
         public Dictionary<string, FakeVideo> Videos { get; } = [];
+        public Dictionary<string, FakeSlideShow> Shows { get; } = [];
         public Action<FakePresenter>? Configure { get; set; }
         public Action<FakeVideo>? ConfigureVideo { get; set; }
 
@@ -154,7 +188,14 @@ public class WaveControllerTests
             }
 
             if (item.Kind == MediaKind.Ppt)
-                throw new NotSupportedException("PowerPoint non ancora gestito");
+            {
+                var s = new FakeSlideShow(tappo.Calls, item.DisplayName);
+                Shows[item.DisplayName] = s;
+                return s;
+            }
+
+            if (item.Kind == MediaKind.Unknown)
+                throw new NotSupportedException("Tipo di file non supportato");
 
             var p = new FakePresenter(tappo.Calls, item.DisplayName);
             Configure?.Invoke(p);
@@ -264,9 +305,91 @@ public class WaveControllerTests
     {
         var (c, _, _) = Create();
 
-        await c.GoAsync(new MediaItem("p.pptx", MediaKind.Ppt));
+        await c.GoAsync(new MediaItem("p.xyz", MediaKind.Unknown));
 
         Assert.Equal(WaveState.Errore, c.State);
+    }
+
+    private static readonly MediaItem P = new("p.pptx", MediaKind.Ppt);
+
+    [Fact]
+    public async Task Ppt_GoNavigateAndStop()
+    {
+        var (c, t, f) = Create();
+
+        await c.GoAsync(P);
+        Assert.Equal(WaveState.InOnda, c.State);
+        Assert.Equal(new PageInfo(1, 5), c.Page);
+
+        Assert.True(c.Next());
+        Assert.Equal(new PageInfo(2, 5), c.Page);
+        Assert.Equal(1, f.Shows["p.pptx"].NextCount);
+
+        await c.StopAsync();
+        Assert.Equal(WaveState.Tappo, c.State);
+        Assert.Equal(1, f.Shows["p.pptx"].CloseCount);
+        Assert.True(t.Calls.IndexOf("cover") < t.Calls.IndexOf("close:p.pptx"));
+    }
+
+    [Fact]
+    public async Task Ppt_EndRequested_FadesBackToTappo()
+    {
+        var (c, t, f) = Create();
+        await c.GoAsync(P);
+        t.Calls.Clear();
+
+        f.Shows["p.pptx"].RaiseEnd(); // "avanti" sull'ultima slide, o fine per tempi automatici
+        await Task.Yield();
+
+        Assert.Equal(WaveState.Tappo, c.State);
+        Assert.Equal(["cover", "close:p.pptx"], t.Calls);
+    }
+
+    [Fact]
+    public async Task Ppt_EndDuringFadeIn_StopsAfterFadeIn()
+    {
+        var (c, t, f) = Create();
+        t.RevealGate = new TaskCompletionSource<bool>();
+
+        var go = c.GoAsync(P);
+        Assert.Equal(WaveState.InTransizioneIn, c.State);
+
+        f.Shows["p.pptx"].RaiseEnd();
+        Assert.Equal(WaveState.InTransizioneIn, c.State);
+
+        t.RevealGate.SetResult(true);
+        await go;
+
+        Assert.Equal(WaveState.Tappo, c.State);
+        Assert.Equal(1, f.Shows["p.pptx"].CloseCount);
+    }
+
+    [Fact]
+    public async Task Ppt_HostFault_GoesToErroreWithTappoImmediately()
+    {
+        var (c, t, f) = Create();
+        string? message = null;
+        c.ErrorOccurred += m => message = m;
+        await c.GoAsync(P);
+
+        f.Shows["p.pptx"].RaiseFault(new TimeoutException("PptHost non risponde"));
+
+        Assert.Equal(WaveState.Errore, c.State);
+        Assert.Contains("coverNow", t.Calls);
+        Assert.Equal(1, f.Shows["p.pptx"].CloseCount);
+        Assert.Contains("PptHost non risponde", message);
+    }
+
+    [Fact]
+    public async Task Ppt_AfterFault_NextGoWorks()
+    {
+        var (c, _, f) = Create();
+        await c.GoAsync(P);
+        f.Shows["p.pptx"].RaiseFault(new TimeoutException("x"));
+
+        await c.GoAsync(A);
+
+        Assert.Equal(WaveState.InOnda, c.State);
     }
 
     private static readonly MediaItem V = new("v.mp4", MediaKind.Video);

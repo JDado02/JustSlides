@@ -16,6 +16,7 @@ public sealed class WaveController
 
     private IContentPresenter? _current;
     private IPlaybackContent? _playback;
+    private ILiveContent? _live;
     private CancellationTokenSource _cts = new();
     private int _generation;
     private bool _endPending;
@@ -250,12 +251,18 @@ public sealed class WaveController
         CurrentItem = item;
         presenter.PageChanged += OnPresenterPageChanged;
 
+        // Video e slideshow possono finire o rompersi da soli.
+        if (presenter is ILiveContent live)
+        {
+            _live = live;
+            live.EndRequested += OnPlaybackEnded;
+            live.Faulted += OnPlaybackFaulted;
+        }
+
         if (presenter is IPlaybackContent playback)
         {
             _playback = playback;
             playback.ProgressChanged += OnPlaybackProgress;
-            playback.EndRequested += OnPlaybackEnded;
-            playback.Faulted += OnPlaybackFaulted;
             // Ogni video parte dal suo volume salvato.
             _liveVolume = Math.Clamp(item.Volume, 0, 100);
             TryApply(p =>
@@ -374,7 +381,7 @@ public sealed class WaveController
 
     private void OnPlaybackEnded()
     {
-        Log.Information("Video terminato: {Item}", CurrentItem?.DisplayName);
+        Log.Information("Contenuto terminato: {Item}", CurrentItem?.DisplayName);
         PlaybackChanged?.Invoke();
 
         switch (_machine.State)
@@ -434,9 +441,14 @@ public sealed class WaveController
         if (_playback is { } playback)
         {
             playback.ProgressChanged -= OnPlaybackProgress;
-            playback.EndRequested -= OnPlaybackEnded;
-            playback.Faulted -= OnPlaybackFaulted;
             _playback = null;
+        }
+
+        if (_live is { } live)
+        {
+            live.EndRequested -= OnPlaybackEnded;
+            live.Faulted -= OnPlaybackFaulted;
+            _live = null;
         }
 
         if (presenter is null)

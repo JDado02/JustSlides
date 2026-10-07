@@ -9,6 +9,7 @@ using Regia.Output;
 using Regia.Output.Audio;
 using Regia.Output.Content;
 using Regia.Output.Monitors;
+using Regia.Output.Ppt;
 using Regia.Output.Transitions;
 using Serilog;
 
@@ -26,6 +27,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly WaveController _wave;
     private readonly TappoTransitions _transitions;
     private readonly ContentPresenterFactory _factory;
+    private readonly PptHostClient _ppt;
     private bool _isScrubbing;
     private bool _syncingPosition;
     private bool _syncingVolume;
@@ -68,13 +70,15 @@ public sealed partial class MainViewModel : ObservableObject
         AppSettings settings,
         WaveController wave,
         TappoTransitions transitions,
-        ContentPresenterFactory factory)
+        ContentPresenterFactory factory,
+        PptHostClient ppt)
     {
         _output = output;
         _store = store;
         _wave = wave;
         _transitions = transitions;
         _factory = factory;
+        _ppt = ppt;
         Settings = settings;
 
         Items.Add(MediaItem.TestPattern);
@@ -85,6 +89,25 @@ public sealed partial class MainViewModel : ObservableObject
         _wave.PlaybackChanged += OnPlaybackChanged;
         _wave.ErrorOccurred += message => Warning = message;
         _factory.Warning += message => Warning = message;
+
+        // PptHost lavora su thread suoi: avvisi e stato si riportano sul thread UI.
+        _ppt.Warning += message => OnUi(() => Warning = message);
+        _ppt.StatusChanged += () => OnUi(() => OnPropertyChanged(nameof(PptStatusText)));
+    }
+
+    /// <summary>Stato di PowerPoint/PptHost per l'operatore.</summary>
+    public string PptStatusText => _ppt.StatusText;
+
+    /// <summary>C'è almeno un file PowerPoint in lista: lo stato di PowerPoint è rilevante.</summary>
+    public bool HasPptItems => Items.Any(i => i.Kind == MediaKind.Ppt);
+
+    private static void OnUi(Action action)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+            action();
+        else
+            dispatcher.BeginInvoke(action);
     }
 
     public AppSettings Settings { get; private set; }
@@ -94,7 +117,9 @@ public sealed partial class MainViewModel : ObservableObject
     public bool HasWarning => !string.IsNullOrEmpty(Warning);
 
     /// <summary>"Pagina N/M" per i PDF; vuoto per i contenuti senza pagine.</summary>
-    public string PageText => _wave.Page is { } page ? $"Pagina {page.Current} / {page.Total}" : "";
+    public string PageText => _wave.Page is { } page
+        ? $"{(_wave.CurrentItem?.Kind == MediaKind.Ppt ? "Slide" : "Pagina")} {page.Current} / {page.Total}"
+        : "";
 
     public bool HasPage => _wave.Page is not null;
 
@@ -176,15 +201,19 @@ public sealed partial class MainViewModel : ObservableObject
     public void AddFiles(IEnumerable<string> paths)
     {
         var rejected = new List<string>();
+        var anyPpt = false;
 
         foreach (var path in paths)
         {
             var item = MediaItem.FromPath(path);
-            if (item.Kind is MediaKind.Image or MediaKind.Pdf or MediaKind.Video)
+            if (item.Kind is MediaKind.Image or MediaKind.Pdf or MediaKind.Video or MediaKind.Ppt)
             {
                 Items.Add(item);
                 SelectedItem = item;
                 Log.Information("File aggiunto alla lista: {Path} ({Kind})", path, item.Kind);
+
+                if (item.Kind == MediaKind.Ppt)
+                    anyPpt = true;
             }
             else
             {
@@ -194,7 +223,18 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         if (rejected.Count > 0)
-            Warning = "File non supportati (per ora solo JPG, PNG, PDF e video): " + string.Join(", ", rejected);
+            Warning = "File non supportati (per ora solo JPG, PNG, PDF, video e PowerPoint): " + string.Join(", ", rejected);
+
+        if (anyPpt)
+        {
+            OnPropertyChanged(nameof(HasPptItems));
+
+            // PowerPoint ci mette qualche secondo ad avviarsi: lo si prepara subito, così il GO è rapido.
+            if (_ppt.ForeignPowerPointRunning)
+                Warning = PptHostClient.ForeignInstanceMessage;
+            else
+                _ppt.Prewarm();
+        }
     }
 
     [RelayCommand]
@@ -207,6 +247,7 @@ public sealed partial class MainViewModel : ObservableObject
         var index = Items.IndexOf(SelectedItem);
         Items.Remove(SelectedItem);
         SelectedItem = Items.Count > 0 ? Items[Math.Min(index, Items.Count - 1)] : null;
+        OnPropertyChanged(nameof(HasPptItems));
     }
 
     [RelayCommand]

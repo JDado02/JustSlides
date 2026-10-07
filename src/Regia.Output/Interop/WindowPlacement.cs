@@ -37,6 +37,16 @@ internal static unsafe class WindowPlacement
         PInvoke.SetWindowLongPtr(hwnd, WINDOW_LONG_PTR_INDEX.GWL_HWNDPARENT, ownerHandle);
     }
 
+    /// <summary>
+    /// Mette una NOSTRA finestra subito dietro un'altra finestra (anche di un altro processo) senza spostarla né attivarla.
+    /// Il contrario (alzare la finestra altrui) Windows lo ignora: l'ordine si ottiene abbassando le nostre.
+    /// </summary>
+    public static void PlaceBehind(Window window, nint other)
+    {
+        PInvoke.SetWindowPos(GetHandle(window), new HWND(other), 0, 0, 0, 0,
+            SET_WINDOW_POS_FLAGS.SWP_NOMOVE | SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE);
+    }
+
     public static void SetPosition(Window window, PixelRect rect, ZOrder zOrder)
     {
         var hwnd = GetHandle(window);

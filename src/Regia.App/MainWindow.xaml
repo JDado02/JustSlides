@@ -74,6 +74,20 @@
           <Button Content="Rimuovi" Command="{Binding RemoveSelectedCommand}" Padding="14,6" Margin="8,0,0,0" />
         </StackPanel>
 
+        <!-- Stato di PowerPoint/PptHost: solo se c'è un PPT in lista -->
+        <TextBlock Text="{Binding PptStatusText}" Margin="0,8,0,0" Opacity="0.75">
+          <TextBlock.Style>
+            <Style TargetType="TextBlock">
+              <Setter Property="Visibility" Value="Collapsed" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding HasPptItems}" Value="True">
+                  <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </TextBlock.Style>
+        </TextBlock>
+
         <!-- Opzioni del video selezionato: valgono dal prossimo GO e si ricordano per ogni file -->
         <StackPanel Margin="0,10,0,0">
           <StackPanel.Style>
