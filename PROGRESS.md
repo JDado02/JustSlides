@@ -10,7 +10,7 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - **M5 Audio PowerPoint: COMPLETATA** e testata a mano dall'utente ("sembra funzionare tutto"; commit `2d5b397`). Build 0 avvisi, 196 test xUnit verdi. Meccanismo CoreAudio provato anche da me con un harness (tono nel suo processo + `ProcessAudioSession` per PID).
 - **M6 UI completa e scaletta: COMPLETATA** e testata a mano dall'utente ("sembra funzionare tutto", dopo i fix del 2026-10-07; commit `8929d65`, `7e9711b`). Build 0 avvisi, 265 test xUnit verdi. Provata da me dal vivo in simulazione con PowerPoint reale (scansione, copia, aggiornamento, rimozione, rinomina, cartella irraggiungibile, GO da copia locale, aggiornamento rimandato durante l'onda, Nuovo evento, riavvio).
 - **M7 Program e tasti: COMPLETATA** e testata a mano dall'utente ("sembra funzionare tutto", dopo i fix del 2026-10-07: tasto T "Torna al Tappo", Program compatto, tooltip e finestre altrui fuori dall'anteprima, specchio DWM in simulazione; commit `a91917a`, `4538536`, `7a5b815`, `ed382c8`). Build 0 avvisi, 359 test xUnit verdi. Provata da me dal vivo in simulazione con PowerPoint reale (tasti, hook sullo slideshow, titoli, slide nascoste, editor tasti, specchio); **non provati con l'output reale** (l'utente ha testato con un solo monitor): hotplug del monitor, cattura dello schermo del monitor reale, clicker vero. Da riprovare in M8 se si ha il secondo monitor.
-- **M8 Hardening: IMPLEMENTATA, in attesa della conferma dell'utente** (test manuali da fare). Build 0 avvisi, 411 test xUnit verdi. Vedi "Decisioni prese in M8".
+- **M8 Hardening: COMPLETATA** e confermata dall'utente ("confermo", 2026-10-07; commit `8fe246d`). Build 0 avvisi, 411 test xUnit verdi. Vedi "Decisioni prese in M8".
 
 ## Ambiente
 - .NET SDK 10.0.401, PowerPoint 16 (M365, x64), git 2.53. Identità git impostata solo nel repo (Davide / chatbotdt@gmail.com).
@@ -226,4 +226,4 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - Il pulsante "10 s ▶▶" non è stato provato dal vivo (lo è "◀◀ 10 s", che usa lo stesso `SeekBy`; coperto dai test).
 
 ## Prossimo passo
-M8 è implementata: attendere i test manuali dell'utente (checklist data a fine milestone). Dopo la conferma il progetto è completo rispetto alla specifica; restano solo le prove con il secondo monitor (OPERATIVO.md §5) e le voci "non fatto / non provato" di M8.
+Tutte le milestone (M1–M8) sono completate e confermate: il progetto è completo rispetto alla specifica. Restano solo le prove con il secondo monitor (OPERATIVO.md §5) e le voci "non fatto / non provato" di M8.
