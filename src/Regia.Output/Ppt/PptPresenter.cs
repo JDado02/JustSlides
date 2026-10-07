@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Threading;
 using Regia.Core.Ppt;
 using Regia.Core.Wave;
+using Regia.Output.Audio;
 using Serilog;
 
 namespace Regia.Output.Ppt;
@@ -15,6 +16,7 @@ namespace Regia.Output.Ppt;
 public sealed class PptPresenter : ISlideShowContent
 {
     private const int FirstSlideRenderMs = 300;
+    private static readonly TimeSpan AudioRestoreDelay = TimeSpan.FromSeconds(2);
 
     private readonly PptHostClient _client;
     private readonly OutputHost _output;
@@ -27,6 +29,9 @@ public sealed class PptPresenter : ISlideShowContent
     private bool _endRaised;
     private PageInfo? _page;
     private IDisposable? _guard;
+    private ProcessAudioSession? _audio;
+    private int _volume = 100;
+    private bool _muted;
 
     public PptPresenter(PptHostClient client, OutputHost output, string path)
     {
@@ -59,6 +64,9 @@ public sealed class PptPresenter : ISlideShowContent
             var open = PptProtocol.ReadData<OpenResult>(opened)
                        ?? throw new InvalidOperationException("Risposta di PowerPoint non valida all'apertura");
             ThrowIfStopped(cancellationToken);
+
+            // Audio: la sessione di POWERPNT.EXE (solo il nostro PID) con volume e Mute già impostati, prima che suoni qualcosa.
+            StartAudioSession();
 
             // La guardia prima del lancio: appena PowerPoint si porta in primo piano il Tappo viene rimesso sopra, senza lampi.
             _guard = _output.GuardTappoOnTop();
@@ -95,12 +103,31 @@ public sealed class PptPresenter : ISlideShowContent
 
     public bool Previous() => Navigate(PptCommands.Previous);
 
+    public void SetVolume(int volume)
+    {
+        _volume = Math.Clamp(volume, 0, 100);
+        _audio?.SetVolume(_volume);
+    }
+
+    public void SetMuted(bool muted)
+    {
+        _muted = muted;
+        _audio?.SetMuted(muted);
+    }
+
+    public Task FadeAudioOutAsync(TimeSpan duration) =>
+        _closed || _audio is null ? Task.CompletedTask : _audio.FadeOutAsync(duration);
+
     public void Close()
     {
         if (_closed)
             return;
 
         _closed = true;
+
+        // Silenzio subito; la sessione torna a 100% quando lo slideshow si è chiuso (EndShow è asincrono).
+        _audio?.Release(AudioRestoreDelay);
+        _audio = null;
         _client.Faulted -= OnClientFaulted;
         _client.SlideChanged -= OnSlideChanged;
         _client.ShowEnded -= OnShowEnded;
@@ -112,6 +139,28 @@ public sealed class PptPresenter : ISlideShowContent
         // Non blocca: se PowerPoint si pianta ci pensa il watchdog.
         if (_sentOpen)
             _ = EndShowAsync();
+    }
+
+    private void StartAudioSession()
+    {
+        try
+        {
+            var pid = _client.PowerPointPid;
+            if (pid <= 0)
+            {
+                Log.Warning("Audio PowerPoint non controllabile: PID del processo sconosciuto");
+                return;
+            }
+
+            _audio = new ProcessAudioSession(pid);
+            _audio.SetVolume(_volume);
+            _audio.SetMuted(_muted);
+        }
+        catch (Exception ex)
+        {
+            // L'audio non deve mai far cadere lo slideshow.
+            Log.Warning(ex, "Audio PowerPoint non controllabile");
+        }
     }
 
     private bool Navigate(string command)

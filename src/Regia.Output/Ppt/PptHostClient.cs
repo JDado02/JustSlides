@@ -284,6 +284,9 @@ public sealed class PptHostClient : IDisposable
         }
     }
 
+    /// <summary>PID del POWERPNT.EXE avviato da noi; 0 se non ce n'è uno (sessione audio da non toccare).</summary>
+    public int PowerPointPid => _powerPoint?.Pid ?? 0;
+
     private void RegisterPowerPoint(int pid)
     {
         if (_powerPoint?.Pid == pid)

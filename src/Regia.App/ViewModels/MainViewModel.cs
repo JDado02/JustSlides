@@ -44,6 +44,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSelectedVideo))]
+    [NotifyPropertyChangedFor(nameof(IsSelectedAudio))]
     [NotifyPropertyChangedFor(nameof(EndReturnToTappo))]
     [NotifyPropertyChangedFor(nameof(EndHoldLastFrame))]
     [NotifyPropertyChangedFor(nameof(EndLoop))]
@@ -63,6 +64,13 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isMuted;
+
+    /// <summary>Avviso fisso: PowerPoint suona sul predefinito di Windows, che non è il dispositivo scelto. Separato da <see cref="Warning"/>.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasAudioDeviceWarning))]
+    private string? _audioDeviceWarning;
+
+    private readonly DefaultDeviceMonitor _deviceMonitor = new();
 
     public MainViewModel(
         OutputHost output,
@@ -93,6 +101,35 @@ public sealed partial class MainViewModel : ObservableObject
         // PptHost lavora su thread suoi: avvisi e stato si riportano sul thread UI.
         _ppt.Warning += message => OnUi(() => Warning = message);
         _ppt.StatusChanged += () => OnUi(() => OnPropertyChanged(nameof(PptStatusText)));
+
+        // Il predefinito di Windows può cambiare in qualsiasi momento (anche a show in corso).
+        _deviceMonitor.Changed += () => OnUi(RefreshAudioDeviceWarning);
+    }
+
+    public bool HasAudioDeviceWarning => !string.IsNullOrEmpty(AudioDeviceWarning);
+
+    /// <summary>C'è un video o un PowerPoint in onda: si mostrano volume dal vivo e Mute.</summary>
+    public bool IsAudioOnAir => _wave.HasAudio;
+
+    /// <summary>Audio senza countdown (PowerPoint): pannello ridotto, solo volume e Mute.</summary>
+    public bool IsSlideShowAudioOnAir => _wave.HasAudio && _wave.Progress is null;
+
+    private void RefreshAudioDeviceWarning() =>
+        AudioDeviceWarning = Regia.Core.Audio.AudioDeviceWarning.Evaluate(
+            Settings.AudioDeviceId, Settings.AudioDeviceName, DefaultDeviceMonitor.GetDefaultId(), HasPptItems);
+
+    /// <summary>Apre le impostazioni audio di Windows per cambiare il dispositivo predefinito.</summary>
+    [RelayCommand]
+    private void OpenWindowsSoundSettings()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:sound") { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Impossibile aprire le impostazioni audio di Windows");
+        }
     }
 
     /// <summary>Stato di PowerPoint/PptHost per l'operatore.</summary>
@@ -139,13 +176,16 @@ public sealed partial class MainViewModel : ObservableObject
 
     public bool IsSelectedVideo => SelectedItem?.Kind == MediaKind.Video;
 
+    /// <summary>Video o PowerPoint selezionato: ha un volume salvato.</summary>
+    public bool IsSelectedAudio => SelectedItem?.Kind is MediaKind.Video or MediaKind.Ppt;
+
     /// <summary>Volume del video selezionato, ricordato per ogni file; impostabile anche prima del GO.</summary>
     public int SelectedVolume
     {
         get => SelectedItem?.Volume ?? 100;
         set
         {
-            if (SelectedItem is not { Kind: MediaKind.Video } item)
+            if (SelectedItem is not { Kind: MediaKind.Video or MediaKind.Ppt } item)
                 return;
 
             value = Math.Clamp(value, 0, 100);
@@ -195,6 +235,7 @@ public sealed partial class MainViewModel : ObservableObject
     public async Task InitializeAsync()
     {
         await ApplyOutputAsync();
+        RefreshAudioDeviceWarning();
     }
 
     /// <summary>Aggiunge file alla lista provvisoria; quelli non gestiti vengono scartati con un avviso.</summary>
@@ -228,6 +269,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (anyPpt)
         {
             OnPropertyChanged(nameof(HasPptItems));
+            RefreshAudioDeviceWarning();
 
             // PowerPoint ci mette qualche secondo ad avviarsi: lo si prepara subito, così il GO è rapido.
             if (_ppt.ForeignPowerPointRunning)
@@ -257,6 +299,7 @@ public sealed partial class MainViewModel : ObservableObject
         Items.Remove(SelectedItem);
         SelectedItem = Items.Count > 0 ? Items[Math.Min(index, Items.Count - 1)] : null;
         OnPropertyChanged(nameof(HasPptItems));
+        RefreshAudioDeviceWarning();
     }
 
     [RelayCommand]
@@ -373,7 +416,11 @@ public sealed partial class MainViewModel : ObservableObject
                 _syncingPosition = false;
             }
 
-            // Quando un video va in onda il cursore dal vivo riparte dal suo volume salvato.
+        }
+
+        // Quando un video o un PowerPoint va in onda il cursore dal vivo riparte dal suo volume salvato.
+        if (_wave.HasAudio)
+        {
             if (!ReferenceEquals(_liveItem, _wave.CurrentItem))
             {
                 _liveItem = _wave.CurrentItem;
@@ -387,6 +434,8 @@ public sealed partial class MainViewModel : ObservableObject
             _liveItem = null;
         }
 
+        OnPropertyChanged(nameof(IsAudioOnAir));
+        OnPropertyChanged(nameof(IsSlideShowAudioOnAir));
         OnPropertyChanged(nameof(IsVideoOnAir));
         OnPropertyChanged(nameof(RemainingText));
         OnPropertyChanged(nameof(ElapsedText));
@@ -446,6 +495,7 @@ public sealed partial class MainViewModel : ObservableObject
         Settings = settings.Normalize();
         _transitions.Settings = Settings;
         _factory.Settings = Settings;
+        RefreshAudioDeviceWarning();
 
         try
         {

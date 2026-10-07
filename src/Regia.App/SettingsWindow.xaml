@@ -49,7 +49,19 @@
         <ListBox ItemsSource="{Binding AudioDevices}" SelectedItem="{Binding SelectedAudioDevice}"
                  DisplayMemberPath="Display" MinHeight="70" MaxHeight="150" />
         <TextBlock Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,0"
-                   Text="Vale per i video. PowerPoint suona sempre sul dispositivo predefinito di Windows." />
+                   Text="Vale per i video. PowerPoint suona sempre sul dispositivo predefinito di Windows (il volume e il Mute della regia agiscono comunque sul suo audio)." />
+        <TextBlock Foreground="#FFFFD79A" TextWrapping="Wrap" Margin="0,6,0,0" Text="{Binding PptAudioNote}">
+          <TextBlock.Style>
+            <Style TargetType="TextBlock">
+              <Setter Property="Visibility" Value="Collapsed" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding HasPptAudioNote}" Value="True">
+                  <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </TextBlock.Style>
+        </TextBlock>
 
         <TextBlock Text="Dissolvenza" FontSize="16" FontWeight="SemiBold" Margin="0,22,0,6" />
         <DockPanel>

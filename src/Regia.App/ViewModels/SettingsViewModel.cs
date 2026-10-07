@@ -52,7 +52,18 @@ public sealed partial class SettingsViewModel : ObservableObject
     private string _tappoPath = "";
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PptAudioNote))]
+    [NotifyPropertyChangedFor(nameof(HasPptAudioNote))]
     private AudioDeviceItem? _selectedAudioDevice;
+
+    private readonly string? _defaultAudioId = DefaultDeviceMonitor.GetDefaultId();
+
+    /// <summary>Avviso informativo: con questa scelta PowerPoint suonerebbe su un altro dispositivo. Null se non serve.</summary>
+    public string? PptAudioNote => SelectedAudioDevice is { } d
+        ? Regia.Core.Audio.AudioDeviceWarning.Evaluate(d.Id, d.Name, _defaultAudioId, hasPpt: true)
+        : null;
+
+    public bool HasPptAudioNote => PptAudioNote is not null;
 
     [ObservableProperty]
     private double _fadeDurationMs;

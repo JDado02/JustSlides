@@ -51,7 +51,8 @@
     </Border>
 
     <!-- Avvisi (monitor mancante, errori...) -->
-    <Border Grid.Row="2" Background="#FF4A2B00" BorderBrush="#FFB26A00" BorderThickness="1" CornerRadius="6"
+    <StackPanel Grid.Row="2">
+    <Border Background="#FF4A2B00" BorderBrush="#FFB26A00" BorderThickness="1" CornerRadius="6"
             Padding="12,8" Margin="0,0,0,14">
       <Border.Style>
         <Style TargetType="Border">
@@ -65,6 +66,28 @@
       </Border.Style>
       <TextBlock Text="{Binding Warning}" TextWrapping="Wrap" Foreground="#FFFFD79A" FontSize="14" />
     </Border>
+
+    <!-- Avviso fisso: PowerPoint suona sul predefinito di Windows, non sul dispositivo scelto -->
+    <Border Background="#FF4A2B00" BorderBrush="#FFB26A00" BorderThickness="1" CornerRadius="6"
+            Padding="12,8" Margin="0,0,0,14">
+      <Border.Style>
+        <Style TargetType="Border">
+          <Setter Property="Visibility" Value="Collapsed" />
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding HasAudioDeviceWarning}" Value="True">
+              <Setter Property="Visibility" Value="Visible" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+      </Border.Style>
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Content="Apri impostazioni audio" Command="{Binding OpenWindowsSoundSettingsCommand}"
+                Padding="12,4" Margin="12,0,0,0" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding AudioDeviceWarning}" TextWrapping="Wrap" Foreground="#FFFFD79A" FontSize="14"
+                   VerticalAlignment="Center" />
+      </DockPanel>
+    </Border>
+    </StackPanel>
 
     <!-- Lista file provvisoria (la scaletta vera arriva in M6) -->
     <DockPanel Grid.Row="3" Margin="0,0,0,14">
@@ -94,13 +117,23 @@
             <Style TargetType="StackPanel">
               <Setter Property="Visibility" Value="Collapsed" />
               <Style.Triggers>
-                <DataTrigger Binding="{Binding IsSelectedVideo}" Value="True">
+                <DataTrigger Binding="{Binding IsSelectedAudio}" Value="True">
                   <Setter Property="Visibility" Value="Visible" />
                 </DataTrigger>
               </Style.Triggers>
             </Style>
           </StackPanel.Style>
           <StackPanel Orientation="Horizontal">
+            <StackPanel.Style>
+              <Style TargetType="StackPanel">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding IsSelectedVideo}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </StackPanel.Style>
             <TextBlock Text="A fine video:" VerticalAlignment="Center" Margin="0,0,10,0" />
             <RadioButton Content="Torna al Tappo" GroupName="VideoEnd" IsChecked="{Binding EndReturnToTappo}" />
             <RadioButton Content="Fermo" GroupName="VideoEnd" IsChecked="{Binding EndHoldLastFrame}"
@@ -108,12 +141,12 @@
             <RadioButton Content="Loop" GroupName="VideoEnd" IsChecked="{Binding EndLoop}" />
           </StackPanel>
           <DockPanel Margin="0,8,0,0">
-            <TextBlock DockPanel.Dock="Left" Text="Volume salvato del video:" VerticalAlignment="Center" Margin="0,0,10,0" />
+            <TextBlock DockPanel.Dock="Left" Text="Volume salvato:" VerticalAlignment="Center" Margin="0,0,10,0" />
             <TextBlock DockPanel.Dock="Right" Width="44" TextAlignment="Right" VerticalAlignment="Center"
                        Text="{Binding SelectedVolume, StringFormat={}{0}%}" />
             <Slider Minimum="0" Maximum="100" Value="{Binding SelectedVolume}" SmallChange="5" LargeChange="10"
                     IsMoveToPointEnabled="True" VerticalAlignment="Center" Margin="0,0,8,0" Focusable="False"
-                    ToolTip="Volume con cui questo video parte a ogni messa in onda (si ricorda per ogni file)" />
+                    ToolTip="Volume con cui questo video o PowerPoint parte a ogni messa in onda (si ricorda per ogni file)" />
           </DockPanel>
         </StackPanel>
       </StackPanel>
@@ -145,7 +178,8 @@
     </Grid>
 
     <!-- Video in onda: countdown, play/pausa, volume (il pannello Program completo arriva in M7) -->
-    <Border Grid.Row="5" Background="{StaticResource PanelBrush}" CornerRadius="8" Padding="14,10" Margin="0,0,0,14">
+    <StackPanel Grid.Row="5">
+    <Border Background="{StaticResource PanelBrush}" CornerRadius="8" Padding="14,10" Margin="0,0,0,14">
       <Border.Style>
         <Style TargetType="Border">
           <Setter Property="Visibility" Value="Collapsed" />
@@ -191,6 +225,30 @@
         </StackPanel>
       </Grid>
     </Border>
+
+    <!-- PowerPoint in onda: solo volume dal vivo e Mute (agiscono sulla sessione audio di POWERPNT.EXE) -->
+    <Border Background="{StaticResource PanelBrush}" CornerRadius="8" Padding="14,10" Margin="0,0,0,14">
+      <Border.Style>
+        <Style TargetType="Border">
+          <Setter Property="Visibility" Value="Collapsed" />
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding IsSlideShowAudioOnAir}" Value="True">
+              <Setter Property="Visibility" Value="Visible" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+      </Border.Style>
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Left" Text="Volume ora" VerticalAlignment="Center"
+                   ToolTip="Volume dal vivo dell'audio di PowerPoint: vale solo per questa messa in onda" />
+        <CheckBox DockPanel.Dock="Right" Content="Mute" IsChecked="{Binding IsMuted}" VerticalAlignment="Center" Margin="12,0,0,0" />
+        <TextBlock DockPanel.Dock="Right" Width="40" TextAlignment="Right" VerticalAlignment="Center"
+                   Text="{Binding Volume, StringFormat={}{0}%}" />
+        <Slider Minimum="0" Maximum="100" Value="{Binding Volume}" SmallChange="5" LargeChange="10"
+                VerticalAlignment="Center" Margin="14,0,8,0" Focusable="False" />
+      </DockPanel>
+    </Border>
+    </StackPanel>
 
     <Grid Grid.Row="6" Margin="0,0,0,14">
       <Grid.ColumnDefinitions>

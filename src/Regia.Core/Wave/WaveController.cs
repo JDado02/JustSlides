@@ -16,6 +16,7 @@ public sealed class WaveController
 
     private IContentPresenter? _current;
     private IPlaybackContent? _playback;
+    private IAudioContent? _audio;
     private ILiveContent? _live;
     private CancellationTokenSource _cts = new();
     private int _generation;
@@ -41,6 +42,9 @@ public sealed class WaveController
     public PlaybackProgress? Progress => _playback?.Progress;
 
     public bool IsPaused => _playback?.IsPaused ?? false;
+
+    /// <summary>Il contenuto in onda (o in entrata) ha un audio controllabile: video o PowerPoint.</summary>
+    public bool HasAudio => _audio is not null;
 
     /// <summary>
     /// Volume dal vivo del video in onda (0-100). Parte dal volume salvato nel file (<see cref="MediaItem.Volume"/>)
@@ -143,10 +147,10 @@ public sealed class WaveController
         }
     }
 
-    /// <summary>Volume dal vivo 0-100 del video in onda. Non cambia il volume salvato nel file: solo questa riproduzione.</summary>
+    /// <summary>Volume dal vivo 0-100 del video o del PowerPoint in onda. Non cambia il volume salvato nel file: solo questa riproduzione.</summary>
     public void SetVolume(int volume)
     {
-        if (_playback is null)
+        if (_audio is null)
             return;
 
         _liveVolume = Math.Clamp(volume, 0, 100);
@@ -263,7 +267,12 @@ public sealed class WaveController
         {
             _playback = playback;
             playback.ProgressChanged += OnPlaybackProgress;
-            // Ogni video parte dal suo volume salvato.
+        }
+
+        if (presenter is IAudioContent audio)
+        {
+            _audio = audio;
+            // Ogni video o PowerPoint parte dal suo volume salvato, prima di caricare (nulla suona sotto il Tappo a volume sbagliato).
             _liveVolume = Math.Clamp(item.Volume, 0, 100);
             TryApply(p =>
             {
@@ -335,11 +344,11 @@ public sealed class WaveController
     private async Task<bool> CoverWithAudioFadeAsync()
     {
         var audio = Task.CompletedTask;
-        if (_playback is { } playback)
+        if (_audio is { } content)
         {
             try
             {
-                audio = playback.FadeAudioOutAsync(_tappo.FadeDuration);
+                audio = content.FadeAudioOutAsync(_tappo.FadeDuration);
             }
             catch (Exception ex)
             {
@@ -361,14 +370,14 @@ public sealed class WaveController
         return covered;
     }
 
-    private void TryApply(Action<IPlaybackContent> action, string name)
+    private void TryApply(Action<IAudioContent> action, string name)
     {
-        if (_playback is null)
+        if (_audio is null)
             return;
 
         try
         {
-            action(_playback);
+            action(_audio);
         }
         catch (Exception ex)
         {
@@ -443,6 +452,8 @@ public sealed class WaveController
             playback.ProgressChanged -= OnPlaybackProgress;
             _playback = null;
         }
+
+        _audio = null;
 
         if (_live is { } live)
         {

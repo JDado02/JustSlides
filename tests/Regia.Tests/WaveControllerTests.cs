@@ -140,6 +140,9 @@ public class WaveControllerTests
     {
         public int CloseCount { get; private set; }
         public int NextCount { get; private set; }
+        public int Volume { get; private set; } = -1;
+        public bool Muted { get; private set; }
+        public List<TimeSpan> Fades { get; } = [];
         public PageInfo? Page { get; private set; } = new(1, 5);
 
         public event Action? PageChanged;
@@ -147,6 +150,17 @@ public class WaveControllerTests
         public event Action<Exception>? Faulted;
 
         public Task LoadAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public void SetVolume(int volume) => Volume = volume;
+
+        public void SetMuted(bool muted) => Muted = muted;
+
+        public Task FadeAudioOutAsync(TimeSpan duration)
+        {
+            Fades.Add(duration);
+            log.Add("audioFade");
+            return Task.CompletedTask;
+        }
 
         public bool Next()
         {
@@ -342,7 +356,8 @@ public class WaveControllerTests
         await Task.Yield();
 
         Assert.Equal(WaveState.Tappo, c.State);
-        Assert.Equal(["cover", "close:p.pptx"], t.Calls);
+        // Il fade audio della sessione PowerPoint parte insieme alla dissolvenza del Tappo.
+        Assert.Equal(["audioFade", "cover", "close:p.pptx"], t.Calls);
     }
 
     [Fact]
@@ -599,6 +614,74 @@ public class WaveControllerTests
         Assert.Equal(70, item.Volume);
         await c.GoAsync(item);
         Assert.Equal(70, f.Videos["v.mp4"].Volume);
+    }
+
+    [Fact]
+    public async Task SlideShow_StartsFromSavedVolume_AndMute()
+    {
+        var (c, _, f) = Create();
+        c.SetMuted(true);
+        var item = new MediaItem("s.pptx", MediaKind.Ppt) { Volume = 60 };
+
+        await c.GoAsync(item);
+
+        Assert.True(c.HasAudio);
+        Assert.Equal(60, f.Shows["s.pptx"].Volume);
+        Assert.True(f.Shows["s.pptx"].Muted);
+        Assert.Equal(60, c.LiveVolume);
+    }
+
+    [Fact]
+    public async Task SlideShow_LiveVolume_DoesNotChangeSavedOne()
+    {
+        var (c, _, f) = Create();
+        var item = new MediaItem("s.pptx", MediaKind.Ppt) { Volume = 60 };
+        await c.GoAsync(item);
+
+        c.SetVolume(25);
+        c.SetMuted(true);
+
+        Assert.Equal(25, f.Shows["s.pptx"].Volume);
+        Assert.True(f.Shows["s.pptx"].Muted);
+        Assert.Equal(60, item.Volume);
+        Assert.Null(c.Progress); // niente countdown per PowerPoint
+    }
+
+    [Fact]
+    public async Task SlideShow_Stop_FadesAudioWithTheTappo()
+    {
+        var (c, t, f) = Create();
+        await c.GoAsync(new MediaItem("s.pptx", MediaKind.Ppt));
+        t.FadeDuration = TimeSpan.FromMilliseconds(700);
+
+        await c.StopAsync();
+
+        Assert.Equal([TimeSpan.FromMilliseconds(700)], f.Shows["s.pptx"].Fades);
+        Assert.False(c.HasAudio);
+    }
+
+    [Fact]
+    public async Task SlideShow_Panic_ClosesWithoutAudioFade()
+    {
+        var (c, _, f) = Create();
+        await c.GoAsync(new MediaItem("s.pptx", MediaKind.Ppt));
+
+        c.Panic();
+
+        Assert.Empty(f.Shows["s.pptx"].Fades);
+        Assert.Equal(1, f.Shows["s.pptx"].CloseCount);
+        Assert.False(c.HasAudio);
+    }
+
+    [Fact]
+    public async Task Image_HasNoAudio_VolumeIsIgnored()
+    {
+        var (c, _, _) = Create();
+        await c.GoAsync(new MediaItem("a.jpg", MediaKind.Image));
+
+        c.SetVolume(10);
+
+        Assert.False(c.HasAudio);
     }
 
     [Fact]

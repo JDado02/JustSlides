@@ -60,11 +60,24 @@ public interface ILiveContent : IContentPresenter
     event Action<Exception>? Faulted;
 }
 
+/// <summary>Contenuto vivo con audio proprio (video VLC, slideshow PowerPoint): volume, Mute e fade in uscita.</summary>
+public interface IAudioContent : ILiveContent
+{
+    /// <summary>Volume 0-100.</summary>
+    void SetVolume(int volume);
+
+    void SetMuted(bool muted);
+
+    /// <summary>Abbassa l'audio a zero in <paramref name="duration"/>; completa a fine rampa o alla chiusura.</summary>
+    Task FadeAudioOutAsync(TimeSpan duration);
+}
+
 /// <summary>
 /// Slideshow PowerPoint pilotato da PptHost. <see cref="IContentPresenter.Next"/> e <see cref="IContentPresenter.Previous"/>
 /// non bloccano mai: il comando parte in background e la pagina si aggiorna con <see cref="IContentPresenter.PageChanged"/>.
+/// L'audio è quello della sessione CoreAudio di POWERPNT.EXE.
 /// </summary>
-public interface ISlideShowContent : ILiveContent
+public interface ISlideShowContent : IAudioContent
 {
 }
 
@@ -72,7 +85,7 @@ public interface ISlideShowContent : ILiveContent
 /// Contenuto a riproduzione continua (video). Il controller lo riconosce con <c>is</c>: immagini e PDF
 /// non lo implementano.
 /// </summary>
-public interface IPlaybackContent : ILiveContent
+public interface IPlaybackContent : IAudioContent
 {
     /// <summary>Fa partire la riproduzione (dopo <see cref="IContentPresenter.LoadAsync"/>, all'inizio della dissolvenza in entrata).</summary>
     void BeginPlayback();
@@ -84,16 +97,8 @@ public interface IPlaybackContent : ILiveContent
 
     PlaybackProgress Progress { get; }
 
-    /// <summary>Volume 0-100.</summary>
-    void SetVolume(int volume);
-
-    void SetMuted(bool muted);
-
     /// <summary>Porta la riproduzione a <paramref name="position"/> (anche in pausa); fuori dai limiti si riporta dentro.</summary>
     void Seek(TimeSpan position);
-
-    /// <summary>Abbassa l'audio a zero in <paramref name="duration"/>; completa a fine rampa o alla chiusura.</summary>
-    Task FadeAudioOutAsync(TimeSpan duration);
 
     /// <summary>Aggiornamento di tempo trascorso / rimanente (pochi al secondo).</summary>
     event Action? ProgressChanged;

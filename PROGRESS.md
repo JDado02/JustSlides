@@ -7,7 +7,8 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - **M2 Macchina a stati + immagini e PDF: COMPLETATA** e testata a mano dall'utente ("funziona tutto"). Build 0 avvisi, 96 test xUnit verdi. Commit `efdfc2c`.
 - **M3 Video: COMPLETATA** e testata a mano dall'utente ("funziona tutto"). Commit `0d1fcb6`. Rifinitura successiva richiesta dall'utente (volume per video + scorrimento), vedi "Decisioni prese in M3". Build 0 avvisi, 131 test xUnit verdi. Seconda rifinitura (bug Tappo nero, volumi indipendenti, tema) il 2026-10-06, vedi sotto.
 - **M4 PptHost: COMPLETATA** e testata a mano dall'utente ("sembra funzionare tutto", dopo i fix del 2026-10-07; commit `76ab5cf`, `5cc662d`, `06e28f8`). Build 0 avvisi, 176 test xUnit verdi. Provata da me end-to-end in simulazione con PowerPoint 16 reale (GO, frecce, fine slideshow, PANIC, kill di host/PowerPoint, regia morta, PowerPoint dell'utente aperto).
-- Prossima: **M5 Audio PowerPoint**. Non iniziare finché l'utente non approva il piano.
+- **M5 Audio PowerPoint: IMPLEMENTATA, in attesa dei test manuali dell'utente** (commit `M5: ...`). Build 0 avvisi, 196 test xUnit verdi. Meccanismo CoreAudio provato dal vivo con un harness (tono nel suo processo + `ProcessAudioSession` per PID); NON provato con un PowerPoint vero che suona.
+- Prossima: **M6 UI completa e scaletta**, solo dopo la conferma dei test di M5 e l'approvazione del piano.
 
 ## Ambiente
 - .NET SDK 10.0.401, PowerPoint 16 (M365, x64), git 2.53. Identità git impostata solo nel repo (Davide / chatbotdt@gmail.com).
@@ -78,6 +79,20 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - **Limite noto (M7)**: i tasti arrivano alla regia solo se è la finestra attiva. Se l'utente clicca un'altra app le frecce vanno a quella; se clicca lo slideshow di PowerPoint le frecce le gestisce PowerPoint stesso (bypassando `SlideNavigator`, ma la fine viene comunque rilevata dal poll). Si risolve con hotkey globali / hook (R3) in M7.
 - `LogSetup.Configure(dir, processTag)`: PptHost scrive nello stesso file di log della regia con il tag `[PptHost]`.
 
+## Decisioni prese in M5 (da rispettare)
+- **Scelte dell'utente**: PPT come i video (volume salvato per file in `MediaItem.Volume` + "Volume ora" dal vivo, Mute globale); avviso dispositivo fisso finché in lista c'è un PPT e il dispositivo scelto ≠ predefinito di Windows (+ riga nelle impostazioni + pulsante "Apri impostazioni audio" = `ms-settings:sound`).
+- **`IAudioContent : ILiveContent`** (Core) con `SetVolume`/`SetMuted`/`FadeAudioOutAsync`; `IPlaybackContent` (video) e `ISlideShowContent` (PPT) la estendono. `WaveController` ha `_audio` (volume iniziale = `item.Volume`, Mute, fade al Tappo) separato da `_playback` (solo video: countdown, pausa, scorrimento); `HasAudio` per la UI. Il volume iniziale si applica PRIMA di `LoadAsync`: il presenter PPT lo ricorda e lo passa alla sessione quando la crea.
+- **`ProcessAudioSession`** (Output/Audio): thread MTA dedicato, scansione ogni 100 ms (30 ms durante il fade) di tutte le sessioni dei dispositivi di rendering attivi con quel PID; imposta `SimpleAudioVolume.Volume` (volume effettivo = `AudioRamp.Effective`: Mute = 0, nessun flag Mute usato). Mai toccato il master né altri processi. Il PID è `PptHostClient.PowerPointPid` (solo il POWERPNT avviato da noi); creata in `PptPresenter.LoadAsync` dopo `Open` e prima di `StartShow`. Errori CoreAudio solo log, mai `Faulted`. Non si usano le notifiche `OnSessionCreated`: basta la scansione.
+- **Ripristino**: Windows ricorda il volume per applicazione. `Close()` del presenter = `Release(2 s)`: silenzio subito, poi sessione a 100% e senza Mute. Una nuova sessione per lo stesso PID sostituisce la vecchia senza che questa ripristini (registro statico per PID). Se la regia muore a metà fade PowerPoint può restare basso fino al GO successivo (da scrivere in OPERATIVO.md, M8).
+- **Avviso**: regola pura `AudioDeviceWarning.Evaluate` (Core, testata); `DefaultDeviceMonitor` (`IMMNotificationClient`) ricalcola da solo al cambio del predefinito; `MainViewModel.AudioDeviceWarning` è un banner SEPARATO da `Warning` (che gli altri messaggi sovrascrivono).
+- UI provvisoria: slider "Volume salvato" ora anche per i PPT (`IsSelectedAudio`); pannello "Volume ora + Mute" ridotto per PPT in onda (`IsSlideShowAudioOnAir`).
+
+## Da verificare a mano in M5 (non provabile da me)
+- PowerPoint vero con audio/video incorporato: il volume ora e il Mute agiscono davvero sul suono; il fade scende col Tappo; dopo il ritorno al Tappo il PowerPoint non resta muto (Mixer di Windows: POWERPNT a 100%).
+- Dispositivo dell'evento ≠ predefinito: banner arancione con nome e pulsante; cambiando il predefinito di Windows a regia aperta il banner compare/sparisce da solo.
+- Un video in slide che parte più tardi (non alla prima slide) rispetta già volume e Mute correnti.
+- PANIC con audio in corso: silenzio immediato.
+
 ## Da verificare a mano in M4 (non provabile da me: serve il monitor di output reale)
 - Slideshow a schermo intero sul monitor di output giusto (non su quello della regia, nemmeno per un istante), con il Tappo che sfuma e rivela le slide **senza lampi** dello slideshow sopra il Tappo all'avvio. (Provato solo in simulazione/finestra.)
 - Il Tappo torna sopra dopo che PowerPoint si porta in primo piano; PANIC e "avanti" oltre l'ultima slide danno Tappo, mai schermata nera di PowerPoint.
@@ -127,4 +142,4 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - Il pulsante "10 s ▶▶" non è stato provato dal vivo (lo è "◀◀ 10 s", che usa lo stesso `SeekBy`; coperto dai test).
 
 ## Prossimo passo
-M4 è chiusa e confermata dall'utente. Leggere CLAUDE.md e questo file e **proporre il piano di M5 (Audio PowerPoint)**: sessione CoreAudio di `POWERPNT.EXE` per PID (il PID è già noto: `PptHostClient` registra `OwnedProcess` "PowerPoint"), fader/Mute, fade audio sincronizzato, avviso se il dispositivo scelto non è il predefinito di Windows. Attendere l'approvazione prima di scrivere codice.
+M5 è implementata: attendere i test manuali dell'utente (sezione "Da verificare a mano in M5"). Solo dopo la conferma, leggere CLAUDE.md e questo file e **proporre il piano di M6 (UI completa e scaletta)**; attendere l'approvazione prima di scrivere codice. Ricordare che `MediaItem.Volume` e `VideoEnd` vanno serializzati nel file show.
