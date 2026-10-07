@@ -54,6 +54,21 @@ public sealed class OutputSupervisor : IDisposable
         _ = CheckAsync(); // stato di partenza
     }
 
+    /// <summary>Solo stress test: simula "monitor scollegato" passando dallo stesso percorso del vero hotplug.</summary>
+    public void InjectLost()
+    {
+        Log.Warning("STRESS: output scollegato simulato");
+        OnLost("simulato");
+    }
+
+    /// <summary>Solo stress test: simula "monitor tornato e stabile" (riposizionamento e Tappo di nuovo visibile).</summary>
+    public void InjectReturned()
+    {
+        Log.Warning("STRESS: output ricollegato simulato");
+        _pendingReapply = true;
+        ApplyPendingIfSafe();
+    }
+
     private void OnDisplaySettingsChanged(object? sender, EventArgs e)
     {
         if (_disposed)

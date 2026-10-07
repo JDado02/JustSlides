@@ -167,6 +167,17 @@ public sealed class PptHostClient : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        // Un guasto è ancora in chiusura (kill in corso): si aspetta, poi si riparte da zero.
+        Task? tearingDown;
+        lock (_gate)
+            tearingDown = _teardown?.Task;
+
+        if (tearingDown is not null)
+        {
+            Log.Information("PowerPoint: attendo la fine della chiusura del guasto prima di ripartire");
+            await Task.WhenAny(tearingDown, Task.Delay(TimeSpan.FromSeconds(10), cancellationToken));
+        }
+
         if (ForeignPowerPointRunning)
             throw new PptException(PptErrors.ForeignInstance, ForeignInstanceMessage);
 
@@ -303,6 +314,36 @@ public sealed class PptHostClient : IDisposable
 
     /// <summary>PID del POWERPNT.EXE avviato da noi; 0 se non ce n'è uno (sessione audio da non toccare).</summary>
     public int PowerPointPid => _powerPoint?.Pid ?? 0;
+
+    /// <summary>PID di PptHost; 0 se non è avviato.</summary>
+    public int HostPid => _hostRecord?.Pid ?? 0;
+
+    /// <summary>
+    /// Solo per lo stress test (guasti iniettati): termina PptHost o il suo PowerPoint, e solo se il processo vivo è
+    /// proprio quello registrato (PID + ora di avvio). Mai per nome, mai processi Office dell'utente.
+    /// </summary>
+    public bool KillOwnedProcessForTest(bool host)
+    {
+        var record = host ? _hostRecord : _powerPoint;
+        if (record is null)
+            return false;
+
+        try
+        {
+            using var process = Process.GetProcessById(record.Pid);
+            if (!record.IsSameProcess(process.Id, process.StartTime.ToUniversalTime()))
+                return false;
+
+            Log.Warning("STRESS: terminato {Role} (pid {Pid}) per provare il watchdog", record.Role, record.Pid);
+            process.Kill();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "STRESS: impossibile terminare {Role} (pid {Pid})", record.Role, record.Pid);
+            return false;
+        }
+    }
 
     private void RegisterPowerPoint(int pid)
     {
@@ -478,27 +519,45 @@ public sealed class PptHostClient : IDisposable
     /// <summary>Guasto: Tappo (evento), kill di PptHost e del nostro PowerPoint, log, pronto a ripartire.</summary>
     private void HandleFailure(int generation, string reason)
     {
+        TaskCompletionSource teardown;
         lock (_gate)
         {
-            if (generation != _generation || _state == PptHostState.Stopped || _disposed)
+            if (generation != _generation || _state == PptHostState.Stopped || _disposed || _teardown is not null)
                 return;
+
+            // Da qui fino a fine teardown le nuove richieste aspettano (vedi EnsureReadyAsync): la regia va in Errore
+            // subito, e un GO immediato non deve finire su una pipe morta né agganciare il PowerPoint che stiamo chiudendo.
+            teardown = _teardown = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         }
 
-        Log.Error("PptHost/PowerPoint fuori uso: {Reason}", reason);
-
-        // (1) subito il Tappo, prima di qualsiasi altra cosa.
         try
         {
-            Faulted?.Invoke(reason);
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Errore nella notifica del guasto");
-        }
+            Log.Error("PptHost/PowerPoint fuori uso: {Reason}", reason);
 
-        // (2)(3)(4)(5)
-        TearDown(generation, reason);
+            // (1) subito il Tappo, prima di qualsiasi altra cosa.
+            try
+            {
+                Faulted?.Invoke(reason);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Errore nella notifica del guasto");
+            }
+
+            // (2)(3)(4)(5)
+            TearDown(generation, reason);
+        }
+        finally
+        {
+            lock (_gate)
+                _teardown = null;
+
+            teardown.TrySetResult();
+        }
     }
+
+    /// <summary>Guasto in corso (kill di PptHost e PowerPoint non ancora finiti); null se non c'è.</summary>
+    private TaskCompletionSource? _teardown;
 
     private void TearDown(int generation, string reason)
     {
@@ -533,17 +592,14 @@ public sealed class PptHostClient : IDisposable
                 _pending.TryRemove(id, out _);
         }
 
+        // Alla chiusura della regia la fine di questi processi è prevista (si è già chiesto Quit): non è un guasto.
+        var why = _disposed ? "chiusura forzata di ciò che non è uscito da solo" : "guasto";
+
         if (host is not null && hostRecord is not null)
-        {
-            Log.Warning("Termino PptHost (pid {Pid})", hostRecord.Pid);
-            TryKillOwned(hostRecord, "guasto", host);
-        }
+            TryKillOwned(hostRecord, why, host, expected: _disposed);
 
         if (powerPoint is not null)
-        {
-            Log.Warning("Termino PowerPoint (pid {Pid})", powerPoint.Pid);
-            TryKillOwned(powerPoint, "guasto");
-        }
+            TryKillOwned(powerPoint, why, expected: _disposed);
 
         try
         {
@@ -560,11 +616,32 @@ public sealed class PptHostClient : IDisposable
         RaiseStatusChanged();
     }
 
+    /// <summary>Tempo massimo per la chiusura ordinata di PowerPoint alla chiusura della regia.</summary>
+    private static readonly TimeSpan QuitTimeout = TimeSpan.FromSeconds(4);
+
+    /// <summary>Attende (al massimo <paramref name="timeout"/>) l'uscita spontanea di un nostro processo; mai oltre il tetto.</summary>
+    private static void WaitForExit(OwnedProcess? record, TimeSpan timeout)
+    {
+        if (record is null || timeout <= TimeSpan.Zero)
+            return;
+
+        try
+        {
+            using var process = Process.GetProcessById(record.Pid);
+            if (record.IsSameProcess(process.Id, process.StartTime.ToUniversalTime()))
+                process.WaitForExit(timeout);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            // Già uscito: è quello che volevamo.
+        }
+    }
+
     /// <summary>
     /// Termina un processo solo se è davvero quello registrato (stesso PID e stessa ora di avvio):
     /// un PID riusato o un PowerPoint dell'utente non si toccano mai.
     /// </summary>
-    private static bool TryKillOwned(OwnedProcess record, string why, Process? known = null)
+    private static bool TryKillOwned(OwnedProcess record, string why, Process? known = null, bool expected = false)
     {
         try
         {
@@ -577,6 +654,11 @@ public sealed class PptHostClient : IDisposable
                 Log.Warning("Il processo {Pid} non è più quello registrato ({Role}): non lo termino", record.Pid, record.Role);
                 return false;
             }
+
+            if (expected)
+                Log.Information("Termino {Role} (pid {Pid}): non è uscito da solo ({Why})", record.Role, record.Pid, why);
+            else
+                Log.Warning("Termino {Role} (pid {Pid})", record.Role, record.Pid);
 
             process.Kill();
             process.WaitForExit(2000);
@@ -615,16 +697,32 @@ public sealed class PptHostClient : IDisposable
         _disposed = true;
 
         // Chiusura ordinata di PowerPoint, con un tetto di tempo; poi si termina quello che resta.
+        // Il Quit chiude prima la presentazione (e lo slideshow, se è in onda) e poi PowerPoint: con uno show in corso può
+        // servire più di un secondo, quindi il tetto è 4 s e si aspetta anche l'uscita effettiva dei due processi.
+        var watch = Stopwatch.StartNew();
+        var quitAnswered = false;
         try
         {
             if (_state == PptHostState.Running)
-                Task.Run(() => SendRawAsync(PptCommands.Quit, null, TimeSpan.FromSeconds(2), CancellationToken.None)).Wait(2500);
+                quitAnswered = Task.Run(() => SendRawAsync(PptCommands.Quit, null, QuitTimeout, CancellationToken.None)).Wait(QuitTimeout + TimeSpan.FromMilliseconds(500));
         }
         catch (Exception ex)
         {
             Log.Debug(ex, "Quit di PptHost non riuscito");
         }
 
+        var (hostRecord, powerPoint) = (_hostRecord, _powerPoint);
+        if (quitAnswered)
+        {
+            WaitForExit(powerPoint, QuitTimeout - watch.Elapsed);
+            WaitForExit(hostRecord, QuitTimeout - watch.Elapsed);
+        }
+        else if (_state == PptHostState.Running)
+        {
+            Log.Warning("PptHost non ha risposto al Quit entro {Seconds} s: si termina quello che resta", QuitTimeout.TotalSeconds);
+        }
+
+        Log.Information("Chiusura ordinata di PowerPoint in {Ms} ms (risposta: {Answered})", watch.ElapsedMilliseconds, quitAnswered);
         TearDown(_generation, "chiusura della regia");
         _job?.Dispose();
         _job = null;

@@ -58,6 +58,22 @@
 
     <!-- Avvisi: generico, audio (PowerPoint), cartella contenuti -->
     <StackPanel Grid.Row="1">
+      <!-- Stress test in corso (viola, fisso; Esc = PANIC e interrompe) -->
+      <Border Background="#FF3A1A5A" BorderBrush="#FF8E5BD0" BorderThickness="1" CornerRadius="6"
+              Padding="12,8" Margin="0,0,0,8">
+        <Border.Style>
+          <Style TargetType="Border">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding HasStressStatus}" Value="True">
+                <Setter Property="Visibility" Value="Visible" />
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </Border.Style>
+        <TextBlock Text="{Binding StressStatus}" TextWrapping="Wrap" Foreground="#FFE6D6FF" FontSize="15" FontWeight="SemiBold" />
+      </Border>
+
       <!-- Output scollegato (rosso, fisso finché il monitor non torna) -->
       <Border Background="#FF5A1010" BorderBrush="#FFC62828" BorderThickness="1" CornerRadius="6"
               Padding="12,8" Margin="0,0,0,8">

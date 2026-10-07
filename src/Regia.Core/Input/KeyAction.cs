@@ -34,6 +34,14 @@ public enum KeyAction
 
 public static class KeyActionInfo
 {
+    /// <summary>
+    /// Se tenere premuto il tasto (autorepeat) deve ripetere l'azione. Solo spostamenti (slide, pagina, selezione):
+    /// GO, PANIC, Torna al Tappo, Play/Pausa e Mute sono comandi singoli (un autorepeat li farebbe scattare a raffica
+    /// o alternare). Unica regola, usata sia dalla finestra regia sia dall'hook di tastiera.
+    /// </summary>
+    public static bool IsRepeatable(KeyAction action) => action is
+        KeyAction.Next or KeyAction.Previous or KeyAction.SelectUp or KeyAction.SelectDown;
+
     /// <summary>Nome mostrato all'operatore.</summary>
     public static string DisplayName(KeyAction action) => action switch
     {

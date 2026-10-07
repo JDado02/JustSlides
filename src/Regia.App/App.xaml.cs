@@ -132,6 +132,17 @@ public partial class App : Application
                 Dispatcher);
             _outputSupervisor.Start();
 
+            // Stress test (solo se richiesto: Regia.App.exe --stress 100 [--faults]).
+            if (TryParseStressArgs(e.Args, out var stressCycles, out var stressFaults))
+            {
+                var runner = new StressRunner(
+                    _viewModel,
+                    _host.Services.GetRequiredService<WaveController>(),
+                    _host.Services.GetRequiredService<PptHostClient>(),
+                    _outputSupervisor);
+                _ = runner.RunAsync(stressCycles, stressFaults);
+            }
+
             // La finestra di simulazione, se c'è, ha rubato il focus: lo restituisco alla regia.
             _mainWindow.Activate();
         }
@@ -142,6 +153,20 @@ public partial class App : Application
             MessageBox.Show($"La regia non è riuscita ad avviarsi:\n\n{ex.Message}", "Regia", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
+    }
+
+    /// <summary>Riconosce <c>--stress N</c> (cicli, 1-10000) e <c>--faults</c>; senza <c>--stress</c> non succede nulla.</summary>
+    private static bool TryParseStressArgs(string[] args, out int cycles, out bool faults)
+    {
+        cycles = 0;
+        faults = args.Contains("--faults", StringComparer.OrdinalIgnoreCase);
+
+        var index = Array.FindIndex(args, a => a.Equals("--stress", StringComparison.OrdinalIgnoreCase));
+        if (index < 0)
+            return false;
+
+        cycles = index + 1 < args.Length && int.TryParse(args[index + 1], out var n) ? Math.Clamp(n, 1, 10000) : 100;
+        return true;
     }
 
     /// <summary>
@@ -163,8 +188,8 @@ public partial class App : Application
                 (hwnd, pid) => output.ClassifyForeground(hwnd, pid, ppt.PowerPointPid),
                 (action, repeat) =>
                 {
-                    // Tenere premuto il tasto non deve mandare in onda a raffica.
-                    if (repeat && action == KeyAction.Go)
+                    // Stessa regola della finestra regia: l'autorepeat ripete solo gli spostamenti.
+                    if (repeat && !KeyActionInfo.IsRepeatable(action))
                         return;
 
                     viewModel.PerformKeyAction(action);

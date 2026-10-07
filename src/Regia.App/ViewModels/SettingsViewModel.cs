@@ -3,6 +3,7 @@ using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using Regia.Core.Media;
 using Regia.Core.Monitors;
 using Regia.Core.Settings;
 using Regia.Output.Audio;
@@ -156,15 +157,22 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         var dialog = new OpenFileDialog
         {
-            Title = IsImageTappo ? "Scegli l'immagine del Tappo" : "Scegli il video del Tappo",
-            Filter = IsImageTappo
-                ? "Immagini|*.jpg;*.jpeg;*.png;*.bmp|Tutti i file|*.*"
-                : "Video|*.mp4;*.mov;*.mkv;*.avi;*.wmv;*.m4v|Tutti i file|*.*",
+            Title = "Scegli il file del Tappo (immagine o video)",
+            // Sempre immagini e video insieme: il tipo del Tappo si imposta da solo dal file scelto.
+            Filter = "Immagini e video|*.jpg;*.jpeg;*.png;*.bmp;*.mp4;*.mov;*.mkv;*.avi;*.wmv;*.m4v" +
+                     "|Immagini|*.jpg;*.jpeg;*.png;*.bmp" +
+                     "|Video|*.mp4;*.mov;*.mkv;*.avi;*.wmv;*.m4v" +
+                     "|Tutti i file|*.*",
             CheckFileExists = true
         };
 
-        if (dialog.ShowDialog() == true)
-            TappoPath = dialog.FileName;
+        if (dialog.ShowDialog() != true)
+            return;
+
+        TappoPath = dialog.FileName;
+
+        // Un video diventa "Video in loop", ogni altro file (immagine) "Immagine".
+        IsImageTappo = MediaKindDetector.FromPath(dialog.FileName) != MediaKind.Video;
     }
 
     [RelayCommand]

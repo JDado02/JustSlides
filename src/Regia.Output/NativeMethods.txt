@@ -18,3 +18,4 @@ IsIconic
 WINDOW_EX_STYLE
 CreateWindowEx
 DestroyWindow
+GetGuiResources

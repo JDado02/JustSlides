@@ -248,6 +248,13 @@ public sealed partial class MainViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasOutputLost))]
     private string? _outputLostMessage;
 
+    /// <summary>Banner viola dello stress test ("STRESS TEST 12/100 ..."); null = nessuno stress in corso.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasStressStatus))]
+    private string? _stressStatus;
+
+    public bool HasStressStatus => !string.IsNullOrEmpty(StressStatus);
+
     /// <summary>L'output è perso: finestre nascoste, GO rifiutato finché non torna.</summary>
     public bool HasOutputLost => !string.IsNullOrEmpty(OutputLostMessage);
 
@@ -617,8 +624,12 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void Panic()
     {
+        PanicPerformed?.Invoke();
         _wave.Panic();
     }
+
+    /// <summary>Sollevato a ogni PANIC (tasto, pulsante, hotplug): lo stress test lo usa per accorgersi che l'operatore vuole fermarlo.</summary>
+    public event Action? PanicPerformed;
 
     private string? _keyboardWarning;
 

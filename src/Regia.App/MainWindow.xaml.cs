@@ -92,8 +92,8 @@ public partial class MainWindow : Window
         if (_keys.Current.Find(chord) is not { } action)
             return;
 
-        // Tenere premuto il tasto non deve mandare in onda a raffica.
-        if (e.IsRepeat && action == KeyAction.Go)
+        // Tenere premuto il tasto ripete solo gli spostamenti (KeyActionInfo.IsRepeatable), mai GO, PANIC, Tappo, Pausa, Mute.
+        if (e.IsRepeat && !KeyActionInfo.IsRepeatable(action))
         {
             e.Handled = true;
             return;
