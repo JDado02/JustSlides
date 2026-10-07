@@ -12,7 +12,7 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - **M7 Program e tasti: COMPLETATA** e testata a mano dall'utente ("sembra funzionare tutto", dopo i fix del 2026-10-07: tasto T "Torna al Tappo", Program compatto, tooltip e finestre altrui fuori dall'anteprima, specchio DWM in simulazione; commit `a91917a`, `4538536`, `7a5b815`, `ed382c8`). Build 0 avvisi, 359 test xUnit verdi. Provata da me dal vivo in simulazione con PowerPoint reale (tasti, hook sullo slideshow, titoli, slide nascoste, editor tasti, specchio); **non provati con l'output reale** (l'utente ha testato con un solo monitor): hotplug del monitor, cattura dello schermo del monitor reale, clicker vero. Da riprovare in M8 se si ha il secondo monitor.
 - **M8 Hardening: COMPLETATA** e confermata dall'utente ("confermo", 2026-10-07; commit `8fe246d`). Build 0 avvisi, 411 test xUnit verdi. Vedi "Decisioni prese in M8".
 
-- **M9 UI professionale: IMPLEMENTATA** (solo grafica, nessuna logica toccata), in attesa della conferma dell'utente dopo la prova manuale. Build 0 avvisi, 411 test xUnit verdi. Vedi "Decisioni prese in M9".
+- **M9 UI professionale: COMPLETATA** (solo grafica, nessuna logica toccata); l'utente ha provato a mano e confermato che "tutto funziona" (2026-10-07; commit `fe4359a`, `723d967`). Poi, fuori milestone: **Verifica PowerPoint** in Impostazioni (commit `c50565a`, `b7e3acd`, vedi la sezione dedicata). Build 0 avvisi, 452 test xUnit verdi. Vedi "Decisioni prese in M9".
 
 ## Ambiente
 - .NET SDK 10.0.401, PowerPoint 16 (M365, x64), git 2.53. Identità git impostata solo nel repo (Davide / chatbotdt@gmail.com).
@@ -240,6 +240,8 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - Se l'utente apre PowerPoint DOPO il pre-avvio, la sua apertura si unisce alla nostra istanza (single-instance, non rilevabile): un kill del watchdog gli farebbe perdere i file. Da scrivere in OPERATIVO.md (M8): "non aprire PowerPoint durante lo show".
 
 ## Aperto / da chiarire
+- **Glitch al primo PDF in onda (segnalato dall'utente dopo M9, NON riprodotto)**: "al primo avvio di un PDF si bugga un po' lo schermo in onda, poi si sblocca". In 3 avvii a freddo in simulazione (PDF da 9 e da 24 pagine, raffica di fotogrammi a ~30 ms sul riquadro Program) Tappo → dissolvenza → pagina erano puliti e nei log non ci sono errori sui PDF. Dai log il primo PDF dopo l'avvio si carica in 0,5–0,8 s contro 0,1–0,15 s dei successivi. Non catturata la vera finestra di simulazione dell'output (sta dietro la regia). Se si ripresenta servono: dove lo si vede (riquadro Program o finestra di output), com'è (sfarfallio, nero, deformato, ritardo), quando (dissolvenza o frecce dopo il GO), quale PDF.
+- **Audio con un Roland come uscita** (domanda dell'utente, non provato con hardware vero): il video segue il dispositivo scelto in Impostazioni; PowerPoint esce sempre dal predefinito di Windows (limite noto). Se un'app ha un'uscita assegnata a mano nel Mixer volume di Windows, l'avviso arancione non lo vede.
 - Il selettore file del Tappo mostra solo immagini finché non si sceglie "Video in loop": proposto di mostrare sempre entrambi (non deciso).
 - Audio del Tappo video: muto per scelta; opzione nelle impostazioni solo se l'utente la chiede.
 - La CPU del Tappo video a pieno schermo non è stata misurata con precisione (obiettivo < 10%).
