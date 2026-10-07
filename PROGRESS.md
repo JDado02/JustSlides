@@ -8,8 +8,8 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - **M3 Video: COMPLETATA** e testata a mano dall'utente ("funziona tutto"). Commit `0d1fcb6`. Rifinitura successiva richiesta dall'utente (volume per video + scorrimento), vedi "Decisioni prese in M3". Build 0 avvisi, 131 test xUnit verdi. Seconda rifinitura (bug Tappo nero, volumi indipendenti, tema) il 2026-10-06, vedi sotto.
 - **M4 PptHost: COMPLETATA** e testata a mano dall'utente ("sembra funzionare tutto", dopo i fix del 2026-10-07; commit `76ab5cf`, `5cc662d`, `06e28f8`). Build 0 avvisi, 176 test xUnit verdi. Provata da me end-to-end in simulazione con PowerPoint 16 reale (GO, frecce, fine slideshow, PANIC, kill di host/PowerPoint, regia morta, PowerPoint dell'utente aperto).
 - **M5 Audio PowerPoint: COMPLETATA** e testata a mano dall'utente ("sembra funzionare tutto"; commit `2d5b397`). Build 0 avvisi, 196 test xUnit verdi. Meccanismo CoreAudio provato anche da me con un harness (tono nel suo processo + `ProcessAudioSession` per PID).
-- **M6 UI completa e scaletta: IMPLEMENTATA, in attesa dei test manuali dell'utente** (commit `M6: ...`). Build 0 avvisi, 265 test xUnit verdi. Provata da me dal vivo in simulazione con PowerPoint reale (scansione, copia, aggiornamento, rimozione, rinomina, cartella irraggiungibile, GO da copia locale, aggiornamento rimandato durante l'onda, Nuovo evento, riavvio).
-- Prossima: **M7 Program e tasti**. Non iniziare finché l'utente non conferma i test di M6 e approva il piano.
+- **M6 UI completa e scaletta: COMPLETATA** e testata a mano dall'utente ("sembra funzionare tutto", dopo i fix del 2026-10-07; commit `8929d65`, `7e9711b`). Build 0 avvisi, 265 test xUnit verdi. Provata da me dal vivo in simulazione con PowerPoint reale (scansione, copia, aggiornamento, rimozione, rinomina, cartella irraggiungibile, GO da copia locale, aggiornamento rimandato durante l'onda, Nuovo evento, riavvio).
+- Prossima: **M7 Program e tasti**. Non iniziare finché l'utente non approva il piano.
 
 ## Ambiente
 - .NET SDK 10.0.401, PowerPoint 16 (M365, x64), git 2.53. Identità git impostata solo nel repo (Davide / chatbotdt@gmail.com).
@@ -177,4 +177,4 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - Il pulsante "10 s ▶▶" non è stato provato dal vivo (lo è "◀◀ 10 s", che usa lo stesso `SeekBy`; coperto dai test).
 
 ## Prossimo passo
-M6 è implementata e committata; **attendere la conferma dei test manuali dell'utente** (checklist data a fine milestone). Poi leggere CLAUDE.md e questo file e **proporre il piano di M7 (Program e tasti)**: cattura a ~5 fps dell'output, slide successiva, hotkey globali (rischio R3), clicker, tasti configurabili, hotplug del monitor. Attendere l'approvazione prima di scrivere codice.
+M6 è chiusa e confermata dall'utente. Leggere CLAUDE.md e questo file e **proporre il piano di M7 (Program e tasti)**: cattura a ~5 fps dell'output, slide successiva, hotkey globali (rischio R3), clicker, tasti configurabili, hotplug del monitor. Attendere l'approvazione prima di scrivere codice.
