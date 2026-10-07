@@ -3,11 +3,14 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using Regia.App.ViewModels;
 using Regia.Core.Input;
 using Regia.Core.Media;
 using Regia.Core.Wave;
+using Regia.Output.Capture;
+using Regia.Output.Interop;
 
 namespace Regia.App;
 
@@ -29,6 +32,28 @@ public partial class MainWindow : Window
             if (ScalettaList.SelectedItem is { } selected)
                 ScalettaList.ScrollIntoView(selected);
         };
+    }
+
+    /// <summary>
+    /// Il riquadro "output" del Program in pixel dell'area client di questa finestra, per lo specchio DWM della simulazione;
+    /// null se non è visibile (finestra ridotta a icona, riquadro nascosto).
+    /// </summary>
+    public MirrorArea? GetOutputMirrorArea()
+    {
+        if (WindowState == WindowState.Minimized || !IsVisible || !OutputBox.IsVisible || OutputBox.ActualWidth < 1)
+            return null;
+
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == 0)
+            return null;
+
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var topLeft = OutputBox.TransformToAncestor(this).Transform(new Point(0, 0));
+        return new MirrorArea(hwnd, new PixelRect(
+            (int)Math.Round(topLeft.X * dpi.DpiScaleX),
+            (int)Math.Round(topLeft.Y * dpi.DpiScaleY),
+            (int)Math.Round(OutputBox.ActualWidth * dpi.DpiScaleX),
+            (int)Math.Round(OutputBox.ActualHeight * dpi.DpiScaleY)));
     }
 
     /// <summary>Permette la chiusura senza conferma (usata allo spegnimento controllato).</summary>

@@ -323,6 +323,15 @@ public sealed class OutputHost : IDisposable
         return _showAttached && powerPointPid > 0 && pid == (uint)powerPointPid ? ForegroundKind.SlideShow : ForegroundKind.Other;
     }
 
+    /// <summary>
+    /// Per lo specchio della simulazione: la finestra che sta SOTTO il Tappo (lo slideshow di PowerPoint, se c'è, altrimenti
+    /// la finestra contenuto). Da chiamare sul thread UI.
+    /// </summary>
+    public nint MirrorBaseWindow => _showAttached && _showWindow != 0 ? _showWindow : HandleOf(Content);
+
+    /// <summary>Per lo specchio della simulazione: la finestra del Tappo (sopra a tutto).</summary>
+    public nint MirrorTopWindow => HandleOf(Tappo);
+
     /// <summary>Una delle nostre finestre di output (contenuto, Tappo, cornice di simulazione). Da chiamare sul thread UI.</summary>
     public bool IsOutputWindow(nint hwnd) =>
         hwnd != 0 && (hwnd == HandleOf(Content) || hwnd == HandleOf(Tappo) || (_simulation is { } frame && hwnd == HandleOf(frame)));

@@ -380,8 +380,8 @@
         <!-- Program (provvisorio fino alla M7): stato, pagina/slide, video, audio, GO, PANIC -->
         <StackPanel Grid.Row="2">
           <!-- Cosa è DAVVERO sul monitor di output (cattura a ~5 fps) -->
-          <Border Background="#FF0F1115" CornerRadius="6" Height="230" Margin="0,0,0,8" ClipToBounds="True"
-                  ToolTip="Ciò che si vede ora sul monitor di output (aggiornato 5 volte al secondo)">
+          <Border x:Name="OutputBox" Background="#FF0F1115" CornerRadius="6" Height="230" Margin="0,0,0,8" ClipToBounds="True"
+                  ToolTip="Ciò che si vede ora sull'output">
             <Image Source="{Binding Program.CaptureImage}" Stretch="Uniform" />
           </Border>
 

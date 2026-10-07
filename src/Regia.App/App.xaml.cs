@@ -32,6 +32,7 @@ public partial class App : Application
     private MainWindow? _mainWindow;
     private KeyboardHook? _keyboardHook;
     private OutputSupervisor? _outputSupervisor;
+    private OutputMirrorService? _outputMirror;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -117,6 +118,12 @@ public partial class App : Application
             _mainWindow.StateChanged += (_, _) => capture.Paused = _mainWindow.WindowState == WindowState.Minimized;
             capture.Start();
 
+            // Simulazione: le vere finestre di output composte da Windows nel riquadro (non lo schermo, che mostrerebbe
+            // anche le finestre che coprono la cornice). Sul monitor reale lavora la cattura qui sopra.
+            _outputMirror = new OutputMirrorService(
+                _host.Services.GetRequiredService<OutputHost>(), Dispatcher, _mainWindow.GetOutputMirrorArea);
+            _outputMirror.Start();
+
             // Hotplug del monitor di output (solo in modalità reale).
             _outputSupervisor = new OutputSupervisor(
                 _host.Services.GetRequiredService<OutputHost>(),
@@ -181,6 +188,7 @@ public partial class App : Application
             Log.Information("=== Chiusura Regia ===");
             _keyboardHook?.Dispose();
             _outputSupervisor?.Dispose();
+            _outputMirror?.Dispose();
             _host?.Services.GetService<OutputCaptureService>()?.Dispose();
             _host?.Services.GetService<ShowController>()?.Dispose(); // ultimo salvataggio dello show
             _host?.Services.GetService<PptHostClient>()?.Dispose();

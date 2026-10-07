@@ -8,8 +8,9 @@ using Serilog;
 namespace Regia.Output.Capture;
 
 /// <summary>
-/// Cattura a bassa frequenza (~5 fps) di ciò che è DAVVERO sullo schermo di output, per il pannello Program: Tappo,
-/// slideshow di PowerPoint, video, tutto com'è composto da Windows. Solo informazione per l'operatore: gli errori si
+/// SOLO monitor reale: cattura a bassa frequenza (~5 fps) di ciò che è DAVVERO sullo schermo di output, per il pannello
+/// Program: Tappo, slideshow di PowerPoint, video, tutto com'è composto da Windows (notifiche di altre app comprese).
+/// In simulazione l'anteprima è lo specchio DWM, vedi <see cref="OutputMirrorService"/>. Solo informazione per l'operatore: gli errori si
 /// loggano e il riquadro resta sull'ultimo fotogramma, mai un PANIC per colpa della cattura.
 /// Il timer gira sul thread UI (legge la posizione delle finestre), la copia dei pixel in un thread del pool, e un solo
 /// fotogramma alla volta: se Windows ci mette troppo il tick successivo viene saltato.
@@ -23,8 +24,6 @@ public sealed class OutputCaptureService : IDisposable
     private const uint Srccopy = 0x00CC0020;
     private const uint Captureblt = 0x40000000;
     private const int Halftone = 4;
-    private const uint WdaNone = 0;
-    private const uint WdaExcludeFromCapture = 0x11;
 
     /// <summary>Dopo tanti errori di fila si smette di scrivere nel log (uno ogni tanto), ma si continua a provare.</summary>
     private const int LogEveryNFailures = 50;
@@ -33,10 +32,6 @@ public sealed class OutputCaptureService : IDisposable
     private readonly DispatcherTimer _timer;
     private int _busy;
     private int _failures;
-    private readonly HashSet<nint> _excluded = [];
-
-    private static readonly bool DisabledByEnvironment =
-        Environment.GetEnvironmentVariable("REGIA_CAPTURE_EXCLUSION") == "0";
 
     public OutputCaptureService(OutputHost output, Dispatcher dispatcher)
     {
@@ -63,7 +58,18 @@ public sealed class OutputCaptureService : IDisposable
     {
         try
         {
-            UpdateExclusions();
+            // In simulazione l'anteprima è lo specchio DWM (OutputMirrorService): la cattura dello schermo mostrerebbe
+            // anche le finestre che coprono la cornice. Qui si lavora solo sul monitor reale.
+            if (_output.Mode != OutputMode.Real)
+            {
+                if (Frame is not null)
+                {
+                    Frame = null;
+                    FrameChanged?.Invoke();
+                }
+
+                return;
+            }
 
             if (Paused || _output.CaptureRect is not { } rect || rect.Width < 16 || rect.Height < 16)
                 return;
@@ -100,47 +106,6 @@ public sealed class OutputCaptureService : IDisposable
         {
             Log.Warning(ex, "Errore nel timer di cattura dell'output");
         }
-    }
-
-    /// <summary>
-    /// SOLO in simulazione: tutte le nostre finestre che non sono di output (la regia, i suggerimenti dei pallini, le
-    /// impostazioni, i messaggi) escono dalla cattura, e Windows mostra ciò che sta dietro: la cornice con l'output vero.
-    /// Senza, il riquadro riprenderebbe la regia stessa e ogni tooltip, cosa che sul monitor reale non succede.
-    /// Si rifà a ogni giro perché i tooltip sono finestre nuove ogni volta. Effetto collaterale accettato: in simulazione la
-    /// regia non si vede negli screenshot e nelle condivisioni dello schermo. Fuori dalla simulazione tutto torna visibile.
-    /// </summary>
-    private void UpdateExclusions()
-    {
-        // Solo sviluppo: con REGIA_CAPTURE_EXCLUSION=0 la regia resta visibile agli screenshot degli script di prova.
-        if (_output.Mode != OutputMode.Simulation || DisabledByEnvironment)
-        {
-            ReleaseExclusions();
-            return;
-        }
-
-        _excluded.RemoveWhere(hwnd => !IsWindow(hwnd));
-
-        EnumThreadWindows(GetCurrentThreadId(), (hwnd, _) =>
-        {
-            if (!_output.IsOutputWindow(hwnd) && !_excluded.Contains(hwnd))
-            {
-                if (SetWindowDisplayAffinity(hwnd, WdaExcludeFromCapture))
-                    _excluded.Add(hwnd);
-            }
-
-            return true;
-        }, 0);
-    }
-
-    private void ReleaseExclusions()
-    {
-        foreach (var hwnd in _excluded)
-        {
-            if (IsWindow(hwnd))
-                SetWindowDisplayAffinity(hwnd, WdaNone);
-        }
-
-        _excluded.Clear();
     }
 
     /// <summary>Copia l'area dallo schermo in un bitmap ridotto (StretchBlt HALFTONE, qualità ok per un'anteprima).</summary>
@@ -199,13 +164,7 @@ public sealed class OutputCaptureService : IDisposable
         }
     }
 
-    public void Dispose()
-    {
-        _timer.Stop();
-        ReleaseExclusions(); // la regia torna visibile alle catture
-    }
-
-    private delegate bool EnumWindowsProc(nint hwnd, nint lParam);
+    public void Dispose() => _timer.Stop();
 
     [StructLayout(LayoutKind.Sequential)]
     private struct BitmapInfoHeader
@@ -228,21 +187,6 @@ public sealed class OutputCaptureService : IDisposable
 
     [DllImport("user32.dll")]
     private static extern int ReleaseDC(nint hwnd, nint dc);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool SetWindowDisplayAffinity(nint hwnd, uint affinity);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool EnumThreadWindows(uint threadId, EnumWindowsProc callback, nint lParam);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool IsWindow(nint hwnd);
-
-    [DllImport("kernel32.dll")]
-    private static extern uint GetCurrentThreadId();
 
     [DllImport("gdi32.dll")]
     private static extern nint CreateCompatibleDC(nint dc);
