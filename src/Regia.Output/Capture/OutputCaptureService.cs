@@ -23,18 +23,25 @@ public sealed class OutputCaptureService : IDisposable
     private const uint Srccopy = 0x00CC0020;
     private const uint Captureblt = 0x40000000;
     private const int Halftone = 4;
+    private const uint WdaNone = 0;
+    private const uint WdaExcludeFromCapture = 0x11;
 
     /// <summary>Dopo tanti errori di fila si smette di scrivere nel log (uno ogni tanto), ma si continua a provare.</summary>
     private const int LogEveryNFailures = 50;
 
     private readonly OutputHost _output;
+    private readonly Func<nint> _operatorWindow;
     private readonly DispatcherTimer _timer;
     private int _busy;
     private int _failures;
+    private bool _operatorExcluded;
 
-    public OutputCaptureService(OutputHost output, Dispatcher dispatcher)
+    /// <param name="operatorWindow">Finestra della regia (HWND). SOLO in simulazione viene esclusa dalla cattura: copre la cornice
+    /// di simulazione e il Program riprenderebbe la regia stessa invece dell'output. Sul monitor reale non serve e non si tocca.</param>
+    public OutputCaptureService(OutputHost output, Dispatcher dispatcher, Func<nint> operatorWindow)
     {
         _output = output;
+        _operatorWindow = operatorWindow;
         _timer = new DispatcherTimer(DispatcherPriority.Background, dispatcher)
         {
             Interval = TimeSpan.FromMilliseconds(CaptureIntervalMs)
@@ -57,6 +64,8 @@ public sealed class OutputCaptureService : IDisposable
     {
         try
         {
+            UpdateOperatorExclusion();
+
             if (Paused || _output.CaptureRect is not { } rect || rect.Width < 16 || rect.Height < 16)
                 return;
 
@@ -92,6 +101,25 @@ public sealed class OutputCaptureService : IDisposable
         {
             Log.Warning(ex, "Errore nel timer di cattura dell'output");
         }
+    }
+
+    /// <summary>
+    /// In simulazione la regia esce dalla cattura (Windows mostra ciò che sta dietro: la cornice con l'output). Effetto
+    /// collaterale voluto e solo in simulazione: la regia non si vede negli screenshot e nelle condivisioni dello schermo.
+    /// </summary>
+    private void UpdateOperatorExclusion()
+    {
+        var simulation = _output.Mode == OutputMode.Simulation;
+        if (simulation == _operatorExcluded)
+            return;
+
+        var hwnd = _operatorWindow();
+        if (hwnd == 0)
+            return;
+
+        _operatorExcluded = simulation;
+        if (!SetWindowDisplayAffinity(hwnd, simulation ? WdaExcludeFromCapture : WdaNone))
+            Log.Debug("SetWindowDisplayAffinity non riuscito (errore Win32 {Error})", Marshal.GetLastWin32Error());
     }
 
     /// <summary>Copia l'area dallo schermo in un bitmap ridotto (StretchBlt HALFTONE, qualità ok per un'anteprima).</summary>
@@ -150,7 +178,15 @@ public sealed class OutputCaptureService : IDisposable
         }
     }
 
-    public void Dispose() => _timer.Stop();
+    public void Dispose()
+    {
+        _timer.Stop();
+
+        // La regia torna visibile alle catture.
+        if (_operatorExcluded && _operatorWindow() is var hwnd and not 0)
+            SetWindowDisplayAffinity(hwnd, WdaNone);
+        _operatorExcluded = false;
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct BitmapInfoHeader
@@ -173,6 +209,10 @@ public sealed class OutputCaptureService : IDisposable
 
     [DllImport("user32.dll")]
     private static extern int ReleaseDC(nint hwnd, nint dc);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetWindowDisplayAffinity(nint hwnd, uint affinity);
 
     [DllImport("gdi32.dll")]
     private static extern nint CreateCompatibleDC(nint dc);

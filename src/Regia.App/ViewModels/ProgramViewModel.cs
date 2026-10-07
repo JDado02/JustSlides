@@ -49,6 +49,9 @@ public sealed partial class ProgramViewModel : ObservableObject
     [ObservableProperty]
     private string _panicLabel = "PANIC";
 
+    [ObservableProperty]
+    private string _backLabel = "TORNA AL TAPPO";
+
     private void RefreshSoon()
     {
         var dispatcher = System.Windows.Application.Current?.Dispatcher;
@@ -69,5 +72,6 @@ public sealed partial class ProgramViewModel : ObservableObject
     {
         GoLabel = ProgramText.ButtonLabel("GO", _keys.Current, KeyAction.Go);
         PanicLabel = ProgramText.ButtonLabel("PANIC", _keys.Current, KeyAction.Panic);
+        BackLabel = ProgramText.ButtonLabel("TORNA AL TAPPO", _keys.Current, KeyAction.BackToTappo);
     }
 }

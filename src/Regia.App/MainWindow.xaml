@@ -525,7 +525,7 @@
               <TextBlock Text="{Binding Program.GoLabel}" Foreground="White" />
             </Button>
             <Button Grid.Column="2" Command="{Binding BackToTappoCommand}" FontSize="22" Padding="14,16">
-              <TextBlock Text="TORNA AL TAPPO" Foreground="White" />
+              <TextBlock Text="{Binding Program.BackLabel}" Foreground="White" />
             </Button>
           </Grid>
 

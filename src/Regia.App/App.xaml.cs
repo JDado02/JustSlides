@@ -90,7 +90,10 @@ public partial class App : Application
                     });
                     services.AddSingleton<ShowController>();
                     services.AddSingleton<PreviewViewModel>();
-                    services.AddSingleton(sp => new OutputCaptureService(sp.GetRequiredService<OutputHost>(), Dispatcher));
+                    services.AddSingleton(sp => new OutputCaptureService(
+                        sp.GetRequiredService<OutputHost>(),
+                        Dispatcher,
+                        () => MainWindow is { } main ? new System.Windows.Interop.WindowInteropHelper(main).Handle : 0));
                     services.AddSingleton<ProgramViewModel>();
                     services.AddSingleton<MainViewModel>();
                     services.AddSingleton<MainWindow>();

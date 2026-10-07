@@ -25,7 +25,11 @@ public enum KeyAction
     PlayPause,
 
     /// <summary>Mute globale.</summary>
-    Mute
+    Mute,
+
+    /// <summary>Uscita normale dall'onda: dissolvenza al Tappo e chiusura del contenuto (come il pulsante "Torna al Tappo").
+    /// Ultima nell'enum: se un tasto è già preso da un'altra azione vince quella.</summary>
+    BackToTappo
 }
 
 public static class KeyActionInfo
@@ -34,13 +38,14 @@ public static class KeyActionInfo
     public static string DisplayName(KeyAction action) => action switch
     {
         KeyAction.Go => "Manda in onda (GO)",
-        KeyAction.Panic => "PANIC (Tappo)",
+        KeyAction.Panic => "PANIC (Tappo immediato, senza dissolvenza)",
         KeyAction.Next => "Slide / pagina avanti",
         KeyAction.Previous => "Slide / pagina indietro",
         KeyAction.SelectUp => "Selezione su",
         KeyAction.SelectDown => "Selezione giù",
         KeyAction.PlayPause => "Play / Pausa video",
         KeyAction.Mute => "Mute",
+        KeyAction.BackToTappo => "Torna al Tappo (con dissolvenza)",
         _ => action.ToString()
     };
 }

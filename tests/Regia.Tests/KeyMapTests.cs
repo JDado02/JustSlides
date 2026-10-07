@@ -23,6 +23,7 @@ public sealed class KeyMapTests : IDisposable
     [InlineData(KeyChord.VkPageUp, KeyAction.Previous)]
     [InlineData('Q', KeyAction.SelectUp)]
     [InlineData('A', KeyAction.SelectDown)]
+    [InlineData('T', KeyAction.BackToTappo)]
     public void Default_AssociaITastiPrevisti(int vk, KeyAction expected) =>
         Assert.Equal(expected, KeyMap.Default.Find(new KeyChord(vk)));
 
@@ -175,6 +176,34 @@ public sealed class KeyMapTests : IDisposable
     [InlineData(5, 0, -1, 0)]    // bordo alto: resta
     public void SelectionStep_SiFermaAiBordi(int count, int current, int delta, int expected) =>
         Assert.Equal(expected, SelectionStep.Move(count, current, delta));
+
+    [Fact]
+    public void EscResta_PanicIstantaneo_ETappoConDissolvenzaHaIlSuoTasto()
+    {
+        // Esc è PANIC (taglio netto) e non diventa mai "Torna al Tappo": sono due azioni con due tasti diversi.
+        Assert.Equal(KeyAction.Panic, KeyMap.Default.Find(KeyMap.PanicChord));
+        Assert.DoesNotContain(KeyMap.PanicChord, KeyMap.Default.ChordsFor(KeyAction.BackToTappo));
+        Assert.NotEmpty(KeyMap.Default.ChordsFor(KeyAction.BackToTappo));
+    }
+
+    [Fact]
+    public void FromJson_FileVecchioSenzaBackToTappo_PrendeIlTastoPredefinito()
+    {
+        var loaded = KeyMap.FromJson("""{ "Go": ["L"] }""");
+
+        Assert.Equal([new KeyChord('T')], loaded.ChordsFor(KeyAction.BackToTappo));
+    }
+
+    [Fact]
+    public void FromJson_FileVecchio_TastoPredefinitoGiaUsatoDaUnAltraAzione_NonSiDuplica()
+    {
+        // L'utente aveva già dato T a Mute: il nuovo predefinito non deve creare un conflitto.
+        var loaded = KeyMap.FromJson("""{ "Mute": ["T"] }""");
+
+        Assert.Equal(KeyAction.Mute, loaded.Find(new KeyChord('T')));
+        Assert.Empty(loaded.ChordsFor(KeyAction.BackToTappo));
+        Assert.Empty(loaded.Conflicts());
+    }
 
     [Fact]
     public void Store_FileAssente_Default()

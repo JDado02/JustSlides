@@ -682,6 +682,10 @@ public sealed partial class MainViewModel : ObservableObject
                 IsMuted = !IsMuted;
                 return true;
 
+            case KeyAction.BackToTappo:
+                BackToTappoCommand.Execute(null);
+                return true;
+
             default:
                 return false;
         }

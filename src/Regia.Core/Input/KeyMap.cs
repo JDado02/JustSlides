@@ -21,7 +21,8 @@ public sealed class KeyMap
         _bindings = bindings;
     }
 
-    /// <summary>L / Spazio / Invio = GO, frecce e PageUp/PageDown = pagina, Q / A = selezione su / giù, Esc = PANIC.</summary>
+    /// <summary>L / Spazio / Invio = GO, frecce e PageUp/PageDown = pagina, Q / A = selezione su / giù, T = Torna al Tappo
+    /// (con dissolvenza), Esc = PANIC (immediato).</summary>
     public static KeyMap Default { get; } = Create(new Dictionary<KeyAction, IReadOnlyList<KeyChord>>
     {
         [KeyAction.Go] = [new KeyChord('L'), new KeyChord(KeyChord.VkSpace), new KeyChord(KeyChord.VkEnter)],
@@ -31,7 +32,8 @@ public sealed class KeyMap
         [KeyAction.SelectUp] = [new KeyChord('Q')],
         [KeyAction.SelectDown] = [new KeyChord('A')],
         [KeyAction.PlayPause] = [],
-        [KeyAction.Mute] = []
+        [KeyAction.Mute] = [],
+        [KeyAction.BackToTappo] = [new KeyChord('T')]
     });
 
     /// <summary>Tasti dell'azione (mai null).</summary>
@@ -135,11 +137,12 @@ public sealed class KeyMap
                 return Default;
 
             var bindings = new Dictionary<KeyAction, IReadOnlyList<KeyChord>>();
+            var missing = new List<KeyAction>();
             foreach (var action in Enum.GetValues<KeyAction>())
             {
                 if (!raw.TryGetValue(action.ToString(), out var texts) || texts is null)
                 {
-                    bindings[action] = Default.ChordsFor(action);
+                    missing.Add(action);
                     continue;
                 }
 
@@ -154,6 +157,12 @@ public sealed class KeyMap
 
                 bindings[action] = chords;
             }
+
+            // Azioni nuove (file scritto da una versione precedente): i tasti predefiniti, ma solo se non sono già
+            // stati dati dall'utente a un'altra azione (niente conflitti inattesi).
+            var taken = bindings.Values.SelectMany(c => c).ToHashSet();
+            foreach (var action in missing)
+                bindings[action] = Default.ChordsFor(action).Where(c => !taken.Contains(c)).ToList();
 
             return Create(bindings);
         }
