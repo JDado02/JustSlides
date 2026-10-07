@@ -317,11 +317,15 @@ public sealed class OutputHost : IDisposable
         if (!_shown)
             return ForegroundKind.Other;
 
-        if (hwnd == HandleOf(Content) || hwnd == HandleOf(Tappo) || (_simulation is { } frame && hwnd == HandleOf(frame)))
+        if (IsOutputWindow(hwnd))
             return ForegroundKind.OutputWindow;
 
         return _showAttached && powerPointPid > 0 && pid == (uint)powerPointPid ? ForegroundKind.SlideShow : ForegroundKind.Other;
     }
+
+    /// <summary>Una delle nostre finestre di output (contenuto, Tappo, cornice di simulazione). Da chiamare sul thread UI.</summary>
+    public bool IsOutputWindow(nint hwnd) =>
+        hwnd != 0 && (hwnd == HandleOf(Content) || hwnd == HandleOf(Tappo) || (_simulation is { } frame && hwnd == HandleOf(frame)));
 
     private static nint HandleOf(System.Windows.Window window) => new System.Windows.Interop.WindowInteropHelper(window).Handle;
 

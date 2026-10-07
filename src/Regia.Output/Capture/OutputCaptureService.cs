@@ -30,18 +30,17 @@ public sealed class OutputCaptureService : IDisposable
     private const int LogEveryNFailures = 50;
 
     private readonly OutputHost _output;
-    private readonly Func<nint> _operatorWindow;
     private readonly DispatcherTimer _timer;
     private int _busy;
     private int _failures;
-    private bool _operatorExcluded;
+    private readonly HashSet<nint> _excluded = [];
 
-    /// <param name="operatorWindow">Finestra della regia (HWND). SOLO in simulazione viene esclusa dalla cattura: copre la cornice
-    /// di simulazione e il Program riprenderebbe la regia stessa invece dell'output. Sul monitor reale non serve e non si tocca.</param>
-    public OutputCaptureService(OutputHost output, Dispatcher dispatcher, Func<nint> operatorWindow)
+    private static readonly bool DisabledByEnvironment =
+        Environment.GetEnvironmentVariable("REGIA_CAPTURE_EXCLUSION") == "0";
+
+    public OutputCaptureService(OutputHost output, Dispatcher dispatcher)
     {
         _output = output;
-        _operatorWindow = operatorWindow;
         _timer = new DispatcherTimer(DispatcherPriority.Background, dispatcher)
         {
             Interval = TimeSpan.FromMilliseconds(CaptureIntervalMs)
@@ -64,7 +63,7 @@ public sealed class OutputCaptureService : IDisposable
     {
         try
         {
-            UpdateOperatorExclusion();
+            UpdateExclusions();
 
             if (Paused || _output.CaptureRect is not { } rect || rect.Width < 16 || rect.Height < 16)
                 return;
@@ -104,22 +103,44 @@ public sealed class OutputCaptureService : IDisposable
     }
 
     /// <summary>
-    /// In simulazione la regia esce dalla cattura (Windows mostra ciò che sta dietro: la cornice con l'output). Effetto
-    /// collaterale voluto e solo in simulazione: la regia non si vede negli screenshot e nelle condivisioni dello schermo.
+    /// SOLO in simulazione: tutte le nostre finestre che non sono di output (la regia, i suggerimenti dei pallini, le
+    /// impostazioni, i messaggi) escono dalla cattura, e Windows mostra ciò che sta dietro: la cornice con l'output vero.
+    /// Senza, il riquadro riprenderebbe la regia stessa e ogni tooltip, cosa che sul monitor reale non succede.
+    /// Si rifà a ogni giro perché i tooltip sono finestre nuove ogni volta. Effetto collaterale accettato: in simulazione la
+    /// regia non si vede negli screenshot e nelle condivisioni dello schermo. Fuori dalla simulazione tutto torna visibile.
     /// </summary>
-    private void UpdateOperatorExclusion()
+    private void UpdateExclusions()
     {
-        var simulation = _output.Mode == OutputMode.Simulation;
-        if (simulation == _operatorExcluded)
+        // Solo sviluppo: con REGIA_CAPTURE_EXCLUSION=0 la regia resta visibile agli screenshot degli script di prova.
+        if (_output.Mode != OutputMode.Simulation || DisabledByEnvironment)
+        {
+            ReleaseExclusions();
             return;
+        }
 
-        var hwnd = _operatorWindow();
-        if (hwnd == 0)
-            return;
+        _excluded.RemoveWhere(hwnd => !IsWindow(hwnd));
 
-        _operatorExcluded = simulation;
-        if (!SetWindowDisplayAffinity(hwnd, simulation ? WdaExcludeFromCapture : WdaNone))
-            Log.Debug("SetWindowDisplayAffinity non riuscito (errore Win32 {Error})", Marshal.GetLastWin32Error());
+        EnumThreadWindows(GetCurrentThreadId(), (hwnd, _) =>
+        {
+            if (!_output.IsOutputWindow(hwnd) && !_excluded.Contains(hwnd))
+            {
+                if (SetWindowDisplayAffinity(hwnd, WdaExcludeFromCapture))
+                    _excluded.Add(hwnd);
+            }
+
+            return true;
+        }, 0);
+    }
+
+    private void ReleaseExclusions()
+    {
+        foreach (var hwnd in _excluded)
+        {
+            if (IsWindow(hwnd))
+                SetWindowDisplayAffinity(hwnd, WdaNone);
+        }
+
+        _excluded.Clear();
     }
 
     /// <summary>Copia l'area dallo schermo in un bitmap ridotto (StretchBlt HALFTONE, qualità ok per un'anteprima).</summary>
@@ -181,12 +202,10 @@ public sealed class OutputCaptureService : IDisposable
     public void Dispose()
     {
         _timer.Stop();
-
-        // La regia torna visibile alle catture.
-        if (_operatorExcluded && _operatorWindow() is var hwnd and not 0)
-            SetWindowDisplayAffinity(hwnd, WdaNone);
-        _operatorExcluded = false;
+        ReleaseExclusions(); // la regia torna visibile alle catture
     }
+
+    private delegate bool EnumWindowsProc(nint hwnd, nint lParam);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct BitmapInfoHeader
@@ -213,6 +232,17 @@ public sealed class OutputCaptureService : IDisposable
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool SetWindowDisplayAffinity(nint hwnd, uint affinity);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnumThreadWindows(uint threadId, EnumWindowsProc callback, nint lParam);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindow(nint hwnd);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
 
     [DllImport("gdi32.dll")]
     private static extern nint CreateCompatibleDC(nint dc);

@@ -34,6 +34,18 @@
 
         <CheckBox Margin="0,18,0,0" IsChecked="{Binding SimulationMode}"
                   Content="Modalità simulazione (output in una finestra sul monitor principale)" />
+        <TextBlock Foreground="#FFFFD79A" TextWrapping="Wrap" Margin="0,6,0,0" Text="{Binding SimulationFallbackNote}">
+          <TextBlock.Style>
+            <Style TargetType="TextBlock">
+              <Setter Property="Visibility" Value="Collapsed" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding HasSimulationFallbackNote}" Value="True">
+                  <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </TextBlock.Style>
+        </TextBlock>
 
         <TextBlock Text="Cartella contenuti" FontSize="16" FontWeight="SemiBold" Margin="0,22,0,6" />
         <DockPanel>

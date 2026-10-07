@@ -43,10 +43,25 @@ public sealed partial class SettingsViewModel : ObservableObject
     public KeyBindingsViewModel? Keys { get; init; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SimulationFallbackNote))]
+    [NotifyPropertyChangedFor(nameof(HasSimulationFallbackNote))]
     private MonitorItem? _selectedMonitor;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SimulationFallbackNote))]
+    [NotifyPropertyChangedFor(nameof(HasSimulationFallbackNote))]
     private bool _simulationMode;
+
+    /// <summary>
+    /// Simulazione tolta ma nessun monitor di output utilizzabile: la regia resta comunque in simulazione (scelta di sicurezza:
+    /// mai senza uscita, mai coprire la regia). Lo si dice qui invece di lasciare la cornice accesa senza spiegazioni.
+    /// </summary>
+    public string? SimulationFallbackNote => !SimulationMode && SelectedMonitor is not { IsSelectable: true }
+        ? "Nessun monitor di output scelto: finché non ne scegli uno (collegato e diverso da quello della regia) la regia resta in " +
+          "simulazione e la cornice di simulazione rimane aperta."
+        : null;
+
+    public bool HasSimulationFallbackNote => SimulationFallbackNote is not null;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsVideoTappo))]
