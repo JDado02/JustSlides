@@ -12,9 +12,8 @@
     <app:PreflightBrushConverter x:Key="PreflightBrush" />
     <BooleanToVisibilityConverter x:Key="BoolToVis" />
 
-    <!-- Altezza fissa della zona info sotto ogni riquadro 16:9 (la stessa per Preview e Program) -->
+    <!-- Altezza MINIMA della zona info sotto ogni riquadro 16:9: se la finestra è più alta le info occupano lo spazio che resta -->
     <sys:Double xmlns:sys="clr-namespace:System;assembly=System.Runtime" x:Key="InfoHeight">140</sys:Double>
-    <GridLength x:Key="InfoRowHeight">140</GridLength>
 
     <!-- Voce della scaletta: linea di inserimento durante il riordino, voce esclusa attenuata -->
     <Style x:Key="ScalettaItem" TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
@@ -307,165 +306,162 @@
         <!-- I due riquadri 16:9 hanno SEMPRE la stessa dimensione (decisa solo dallo spazio disponibile) -->
         <app:MonitorPairPanel Grid.Row="0" Gap="16" InfoHeight="{StaticResource InfoHeight}">
 
-          <!-- Preview: solo anteprima, mai per l'onda -->
-          <Grid DataContext="{Binding Preview}">
+          <!-- 1) Riquadro Preview: solo anteprima, mai per l'onda -->
+          <Border DataContext="{Binding Preview}" Background="{StaticResource WellBrush}"
+                  BorderBrush="{StaticResource PreviewFrameBrush}" BorderThickness="2" ClipToBounds="True">
+            <Grid>
+              <Image Source="{Binding Image}" Stretch="Uniform" AutomationProperties.AutomationId="PreviewImage" />
+              <TextBlock Text="{Binding Placeholder}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                         Foreground="{StaticResource MutedBrush}" FontSize="14" TextAlignment="Center" TextWrapping="Wrap" Margin="16,0">
+                <TextBlock.Style>
+                  <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding HasImage}" Value="True">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </TextBlock.Style>
+              </TextBlock>
+            </Grid>
+          </Border>
+
+          <!-- 2) Riquadro Program: OutputBox = area dello specchio DWM (simulazione) e della cattura, dentro la cornice di stato -->
+          <Border Style="{StaticResource StateFrame}" BorderThickness="2" Background="{StaticResource WellBrush}">
+            <Border x:Name="OutputBox" Background="{StaticResource WellBrush}" ClipToBounds="True"
+                    ToolTip="Ciò che si vede ora sull'output">
+              <Image Source="{Binding Program.CaptureImage}" Stretch="Uniform" AutomationProperties.AutomationId="ProgramImage" />
+            </Border>
+          </Border>
+
+          <!-- 3) Info Preview: occupa tutto lo spazio sotto il riquadro; le righe scorrono solo se non entrano -->
+          <Grid DataContext="{Binding Preview}" Margin="0,8,0,0">
             <Grid.RowDefinitions>
+              <RowDefinition Height="18" />
+              <RowDefinition Height="24" />
+              <RowDefinition Height="20" />
               <RowDefinition Height="*" />
-              <RowDefinition Height="{StaticResource InfoRowHeight}" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Background="{StaticResource WellBrush}" BorderBrush="{StaticResource PreviewFrameBrush}"
-                    BorderThickness="2" ClipToBounds="True">
-              <Grid>
-                <Image Source="{Binding Image}" Stretch="Uniform" AutomationProperties.AutomationId="PreviewImage" />
-                <TextBlock Text="{Binding Placeholder}" HorizontalAlignment="Center" VerticalAlignment="Center"
-                           Foreground="{StaticResource MutedBrush}" FontSize="14" TextAlignment="Center" TextWrapping="Wrap" Margin="16,0">
-                  <TextBlock.Style>
-                    <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-                      <Setter Property="Visibility" Value="Visible" />
-                      <Style.Triggers>
-                        <DataTrigger Binding="{Binding HasImage}" Value="True">
-                          <Setter Property="Visibility" Value="Collapsed" />
-                        </DataTrigger>
-                      </Style.Triggers>
-                    </Style>
-                  </TextBlock.Style>
-                </TextBlock>
-              </Grid>
-            </Border>
+            <DockPanel Grid.Row="0">
+              <Ellipse DockPanel.Dock="Right" Width="12" Height="12" VerticalAlignment="Center"
+                       Fill="{Binding Status, Converter={StaticResource PreflightBrush}}" />
+              <TextBlock Text="PREVIEW" Style="{StaticResource SectionLabel}" Foreground="{StaticResource PreviewFrameBrush}" />
+            </DockPanel>
+            <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Row="2" Text="{Binding Subtitle}" Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis" />
 
-            <Grid Grid.Row="1" Margin="0,8,0,0">
-              <Grid.RowDefinitions>
-                <RowDefinition Height="18" />
-                <RowDefinition Height="24" />
-                <RowDefinition Height="20" />
-                <RowDefinition Height="*" />
-              </Grid.RowDefinitions>
-
-              <DockPanel Grid.Row="0">
-                <Ellipse DockPanel.Dock="Right" Width="12" Height="12" VerticalAlignment="Center"
-                         Fill="{Binding Status, Converter={StaticResource PreflightBrush}}" />
-                <TextBlock Text="PREVIEW" Style="{StaticResource SectionLabel}" Foreground="{StaticResource PreviewFrameBrush}" />
-              </DockPanel>
-              <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-              <TextBlock Grid.Row="2" Text="{Binding Subtitle}" Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis" />
-
-              <!-- Zona fissa: righe del pre-flight, oppure pagine del PDF -->
-              <Grid Grid.Row="3" Margin="0,4,0,0">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
-                  <ScrollViewer.Style>
-                    <Style TargetType="ScrollViewer">
-                      <Setter Property="Visibility" Value="Visible" />
-                      <Style.Triggers>
-                        <DataTrigger Binding="{Binding HasPages}" Value="True">
-                          <Setter Property="Visibility" Value="Collapsed" />
-                        </DataTrigger>
-                      </Style.Triggers>
-                    </Style>
-                  </ScrollViewer.Style>
-                  <ItemsControl ItemsSource="{Binding Lines}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate>
-                        <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="12" Margin="0,1" />
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </ScrollViewer>
-
-                <ListBox ItemsSource="{Binding Pages}" BorderThickness="0" Background="Transparent"
-                         ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Auto">
-                  <ListBox.Style>
-                    <Style TargetType="ListBox" BasedOn="{StaticResource {x:Type ListBox}}">
-                      <Setter Property="Visibility" Value="Collapsed" />
-                      <Style.Triggers>
-                        <DataTrigger Binding="{Binding HasPages}" Value="True">
-                          <Setter Property="Visibility" Value="Visible" />
-                        </DataTrigger>
-                      </Style.Triggers>
-                    </Style>
-                  </ListBox.Style>
-                  <ListBox.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <VirtualizingStackPanel Orientation="Horizontal" />
-                    </ItemsPanelTemplate>
-                  </ListBox.ItemsPanel>
-                  <ListBox.ItemContainerStyle>
-                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
-                      <Setter Property="Padding" Value="3,2" />
-                      <Setter Property="Focusable" Value="False" />
-                    </Style>
-                  </ListBox.ItemContainerStyle>
-                  <ListBox.ItemTemplate>
+            <!-- Righe del pre-flight, oppure pagine del PDF -->
+            <Grid Grid.Row="3" Margin="0,6,0,0">
+              <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+                <ScrollViewer.Style>
+                  <Style TargetType="ScrollViewer">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding HasPages}" Value="True">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </ScrollViewer.Style>
+                <ItemsControl ItemsSource="{Binding Lines}">
+                  <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                      <StackPanel Width="52">
-                        <Image Source="{Binding Image}" Height="38" Stretch="Uniform" />
-                        <TextBlock Text="{Binding Number}" HorizontalAlignment="Center" FontSize="11"
-                                   Foreground="{StaticResource MutedBrush}" />
-                      </StackPanel>
+                      <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="13" Margin="0,2" />
                     </DataTemplate>
-                  </ListBox.ItemTemplate>
-                </ListBox>
-              </Grid>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+
+              <ListBox ItemsSource="{Binding Pages}" BorderThickness="0" Background="Transparent"
+                       ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                <ListBox.Style>
+                  <Style TargetType="ListBox" BasedOn="{StaticResource {x:Type ListBox}}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding HasPages}" Value="True">
+                        <Setter Property="Visibility" Value="Visible" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </ListBox.Style>
+                <ListBox.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <VirtualizingStackPanel Orientation="Horizontal" />
+                  </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemContainerStyle>
+                  <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                    <Setter Property="Padding" Value="3,2" />
+                    <Setter Property="Focusable" Value="False" />
+                  </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                  <DataTemplate>
+                    <StackPanel Width="52">
+                      <Image Source="{Binding Image}" Height="38" Stretch="Uniform" />
+                      <TextBlock Text="{Binding Number}" HorizontalAlignment="Center" FontSize="11"
+                                 Foreground="{StaticResource MutedBrush}" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
             </Grid>
           </Grid>
 
-          <!-- Program: cosa va davvero in onda -->
-          <Grid>
+          <!-- 4) Info Program -->
+          <Grid Margin="0,8,0,0">
             <Grid.RowDefinitions>
+              <RowDefinition Height="18" />
+              <RowDefinition Height="46" />
+              <RowDefinition Height="34" />
               <RowDefinition Height="*" />
-              <RowDefinition Height="{StaticResource InfoRowHeight}" />
             </Grid.RowDefinitions>
 
-            <!-- OutputBox = area dello specchio DWM (simulazione) e della cattura: dentro la cornice di stato -->
-            <Border Grid.Row="0" Style="{StaticResource StateFrame}" BorderThickness="2" Background="{StaticResource WellBrush}">
-              <Border x:Name="OutputBox" Background="{StaticResource WellBrush}" ClipToBounds="True"
-                      ToolTip="Ciò che si vede ora sull'output">
-                <Image Source="{Binding Program.CaptureImage}" Stretch="Uniform" AutomationProperties.AutomationId="ProgramImage" />
-              </Border>
+            <TextBlock Grid.Row="0" Text="PROGRAM" Style="{StaticResource SectionLabel}" />
+
+            <!-- Stato dell'onda, sempre della stessa altezza -->
+            <Border Grid.Row="1" Style="{StaticResource StateFill}" CornerRadius="6" Padding="14,0">
+              <DockPanel VerticalAlignment="Center">
+                <TextBlock DockPanel.Dock="Left" Text="{Binding StateText}" FontSize="22" FontWeight="Bold" Foreground="White" />
+                <TextBlock Text="{Binding Program.OnAirName}" FontSize="13" Foreground="White" Opacity="0.9"
+                           HorizontalAlignment="Right" VerticalAlignment="Center" Margin="16,0,0,0"
+                           TextTrimming="CharacterEllipsis" />
+              </DockPanel>
             </Border>
 
-            <Grid Grid.Row="1" Margin="0,8,0,0">
-              <Grid.RowDefinitions>
-                <RowDefinition Height="18" />
-                <RowDefinition Height="46" />
-                <RowDefinition Height="34" />
-                <RowDefinition Height="*" />
-              </Grid.RowDefinitions>
-
-              <TextBlock Grid.Row="0" Text="PROGRAM" Style="{StaticResource SectionLabel}" />
-
-              <!-- Stato dell'onda, sempre della stessa altezza -->
-              <Border Grid.Row="1" Style="{StaticResource StateFill}" CornerRadius="6" Padding="14,0">
-                <DockPanel VerticalAlignment="Center">
-                  <TextBlock DockPanel.Dock="Left" Text="{Binding StateText}" FontSize="22" FontWeight="Bold" Foreground="White" />
-                  <TextBlock Text="{Binding Program.OnAirName}" FontSize="13" Foreground="White" Opacity="0.9"
-                             HorizontalAlignment="Right" VerticalAlignment="Center" Margin="16,0,0,0"
-                             TextTrimming="CharacterEllipsis" />
-                </DockPanel>
-              </Border>
-
-              <!-- Pagina / slide N/M: sempre presente, attiva solo con PDF o PPT in onda -->
-              <Grid Grid.Row="2" Margin="0,4,0,0" IsEnabled="{Binding HasPage}">
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="56" />
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="56" />
-                </Grid.ColumnDefinitions>
-                <Button Grid.Column="0" Command="{Binding PreviousPageCommand}" Padding="0,2"
-                        AutomationProperties.Name="Pagina precedente" ToolTip="Pagina o slide precedente">
-                  <TextBlock Text="&#xE76B;" Style="{StaticResource IconText}" />
-                </Button>
-                <TextBlock Grid.Column="1" Text="{Binding PageText}" FontSize="18" FontWeight="SemiBold"
-                           HorizontalAlignment="Center" VerticalAlignment="Center" />
-                <Button Grid.Column="2" Command="{Binding NextPageCommand}" Padding="0,2"
-                        AutomationProperties.Name="Pagina successiva" ToolTip="Pagina o slide successiva">
-                  <TextBlock Text="&#xE76C;" Style="{StaticResource IconText}" />
-                </Button>
-              </Grid>
-
-              <TextBlock Grid.Row="3" Text="{Binding Program.NextText}" FontSize="13" Margin="0,4,0,0"
-                         TextTrimming="CharacterEllipsis" Foreground="{StaticResource MutedBrush}" />
+            <!-- Pagina / slide N/M con le frecce: visibili solo con un PDF o un PPT in onda (Hidden = lo spazio resta, nulla si sposta) -->
+            <Grid Grid.Row="2" Margin="0,4,0,0">
+              <Grid.Style>
+                <Style TargetType="Grid">
+                  <Setter Property="Visibility" Value="Hidden" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding HasPage}" Value="True">
+                      <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Grid.Style>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="56" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="56" />
+              </Grid.ColumnDefinitions>
+              <Button Grid.Column="0" Command="{Binding PreviousPageCommand}" Padding="0,2"
+                      AutomationProperties.Name="Pagina precedente" ToolTip="Pagina o slide precedente">
+                <TextBlock Text="&#xE76B;" Style="{StaticResource IconText}" />
+              </Button>
+              <TextBlock Grid.Column="1" Text="{Binding PageText}" FontSize="18" FontWeight="SemiBold"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+              <Button Grid.Column="2" Command="{Binding NextPageCommand}" Padding="0,2"
+                      AutomationProperties.Name="Pagina successiva" ToolTip="Pagina o slide successiva">
+                <TextBlock Text="&#xE76C;" Style="{StaticResource IconText}" />
+              </Button>
             </Grid>
+
+            <TextBlock Grid.Row="3" Text="{Binding Program.NextText}" FontSize="13" Margin="0,4,0,0"
+                       TextTrimming="CharacterEllipsis" Foreground="{StaticResource MutedBrush}" />
           </Grid>
         </app:MonitorPairPanel>
 
