@@ -17,6 +17,15 @@ namespace Regia.PptHost;
 internal sealed class PowerPointDriver
 {
     private const int PollIntervalMs = 250;
+
+    /// <summary>Sull'ultima slide si controlla più spesso: se PowerPoint passa da solo alla sua schermata nera finale si deve saperlo subito.</summary>
+    private const int LastSlidePollIntervalMs = 100;
+
+    /// <summary>Un errore COM isolato non basta: si dichiara il guasto solo dopo questo tempo di errori continui.</summary>
+    private const int PollFailureWindowMs = 700;
+
+    /// <summary>ppSlideShowDone: PowerPoint ha finito e mostra la schermata nera "Fine della presentazione".</summary>
+    private const int SlideShowDone = 5;
     private const int PlacementChecks = 16;           // ~4 s di verifica della posizione dopo il lancio
     private const int MaxConsecutivePollFailures = 3;
 
@@ -153,6 +162,8 @@ internal sealed class PowerPointDriver
             _lastPosition = ReadPosition();
             _showActive = true;
             _pollFailures = 0;
+            _poll.Interval = TimeSpan.FromMilliseconds(PollIntervalMs);
+            _firstPollFailureTick = 0;
             _poll.Start();
         }
         catch
@@ -310,6 +321,21 @@ internal sealed class PowerPointDriver
         return _showWindow.View;
     }
 
+    private long _firstPollFailureTick;
+
+    /// <summary>Stato della vista dello slideshow (<c>View.State</c>); 0 se non leggibile.</summary>
+    private int ReadViewState()
+    {
+        try
+        {
+            return (int)_showWindow!.View.State;
+        }
+        catch (Exception ex) when (ex is COMException or Microsoft.CSharp.RuntimeBinder.RuntimeBinderException)
+        {
+            return 0;
+        }
+    }
+
     private int ReadPosition()
     {
         try
@@ -362,6 +388,15 @@ internal sealed class PowerPointDriver
                 return;
             }
 
+            // Se l'avanzamento non è passato da noi (clic o tasto sullo slideshow) PowerPoint può arrivare alla sua
+            // schermata nera finale e restarci fino al clic successivo: la si tratta come fine dello show, così la
+            // regia fa la dissolvenza al Tappo e chiude lo slideshow invece di lasciare il nero in onda.
+            if (ReadViewState() == SlideShowDone)
+            {
+                FinishShow(faulted: false, "PowerPoint è arrivato alla schermata nera finale");
+                return;
+            }
+
             int position = ReadPosition();
             if (position > 0 && position != _lastPosition)
             {
@@ -369,14 +404,20 @@ internal sealed class PowerPointDriver
                 SlideChanged?.Invoke(position, _total);
             }
 
+            _poll.Interval = TimeSpan.FromMilliseconds(position > 0 && position >= _total ? LastSlidePollIntervalMs : PollIntervalMs);
+
             _pollFailures = 0;
+            _firstPollFailureTick = 0;
             VerifyPlacement();
         }
         catch (Exception ex)
         {
             _pollFailures++;
+            if (_firstPollFailureTick == 0)
+                _firstPollFailureTick = Environment.TickCount64;
+
             Log.Warning(ex, "Polling di PowerPoint fallito ({Count}/{Max})", _pollFailures, MaxConsecutivePollFailures);
-            if (_pollFailures >= MaxConsecutivePollFailures)
+            if (_pollFailures >= MaxConsecutivePollFailures && Environment.TickCount64 - _firstPollFailureTick >= PollFailureWindowMs)
                 FinishShow(faulted: true, "PowerPoint non risponde alle chiamate COM");
         }
         finally

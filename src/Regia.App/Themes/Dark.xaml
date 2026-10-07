@@ -30,6 +30,26 @@
     <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
   </Style>
 
+  <!-- Suggerimenti (tooltip): senza stile erano testo chiaro su sfondo chiaro, illeggibili -->
+  <Style TargetType="ToolTip">
+    <Setter Property="Background" Value="#FF2D323B" />
+    <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="10,6" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ToolTip">
+          <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+            <ContentPresenter TextElement.Foreground="{TemplateBinding Foreground}" />
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
   <Style TargetType="CheckBox">
     <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
     <Setter Property="Margin" Value="0,4" />
