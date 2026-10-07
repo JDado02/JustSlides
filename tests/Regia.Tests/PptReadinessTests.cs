@@ -50,7 +50,7 @@ public sealed class PptReadinessTests
         var report = PptReadiness.Evaluate(Facts(PptLicenseState.NotLicensed));
 
         Assert.Equal(PptCheckLevel.Warning, report.Level);
-        Assert.Contains("NON è attivato", report.Summary);
+        Assert.Contains("risulta NON attiva", report.Summary);
     }
 
     [Fact]
@@ -168,12 +168,92 @@ public sealed class PptReadinessTests
         ---Exiting-----------------------------
         """;
 
+    // SKU della voce di tolleranza elencata da OSPP e SKU che PowerPoint usa davvero (registro dell'utente), sul PC di sviluppo.
+    private const string GraceSku = "3d0631e3-1091-416d-92a5-42f84a86d868";
+    private const string SubscriptionSku = "6337137e-7c07-4197-8986-bece6a76fc33";
+
+    [Fact]
+    public void Regressione_AbbonamentoLegatoAllAccount_NonEDaSegnalareComeNonAttivato()
+    {
+        // Segnalato dall'utente: la voce OSPP è "grace period expired", ma PowerPoint usa un altro SKU (abbonamento attivo).
+        var entries = OsppParser.Parse(RealOutput);
+
+        var (state, detail) = OsppParser.Resolve(entries, [SubscriptionSku + ","]);
+
+        Assert.Equal(PptLicenseState.LicensedPerUser, state);
+        Assert.Contains("OSPP", detail);
+        Assert.DoesNotContain("grace period expired", detail);
+    }
+
+    [Fact]
+    public void LicenzaInUsoUgualeAllaVoceScaduta_NonAttivato()
+    {
+        var entries = OsppParser.Parse(RealOutput);
+
+        var (state, detail) = OsppParser.Resolve(entries, ["{" + GraceSku.ToUpperInvariant() + "}"]);
+
+        Assert.Equal(PptLicenseState.NotLicensed, state);
+        Assert.Contains("grace period expired", detail);
+    }
+
+    [Fact]
+    public void SenzaSkuInUso_SiRicadeSullaSolaSintesiOspp()
+    {
+        var (state, _) = OsppParser.Resolve(OsppParser.Parse(RealOutput), []);
+
+        Assert.Equal(PptLicenseState.NotLicensed, state);
+    }
+
+    [Fact]
+    public void SkuInUsoMaOsppVuoto_Sconosciuto()
+    {
+        var (state, _) = OsppParser.Resolve([], [SubscriptionSku]);
+
+        Assert.Equal(PptLicenseState.Unknown, state);
+    }
+
+    [Fact]
+    public void AbbonamentoPerUtente_Verde_ConLaNota()
+    {
+        var report = PptReadiness.Evaluate(Facts(PptLicenseState.LicensedPerUser) with { LicenseDetail = "legata all'account" });
+
+        Assert.Equal(PptCheckLevel.Ok, report.Level);
+        Assert.Contains("legata all'account", report.Summary);
+        Assert.Contains(report.Lines, l => l.StartsWith("Attivazione: abbonamento legato all'account"));
+    }
+
+    [Fact]
+    public void Ospp_PiuProdotti_OgnunoHaIlSuoSku()
+    {
+        const string output = """
+            PRODUCT ID: 1
+            SKU ID: {AAAAAAAA-0000-0000-0000-000000000001}
+            LICENSE NAME: Office 16, Office16ProPlusVL_KMS_Client edition
+            LICENSE STATUS:  ---LICENSED---
+            PRODUCT ID: 2
+            SKU ID: bbbbbbbb-0000-0000-0000-000000000002
+            LICENSE NAME: Office 16, Office16VisioPro edition
+            LICENSE STATUS:  ---UNLICENSED---
+            """;
+
+        var entries = OsppParser.Parse(output);
+
+        Assert.Equal(2, entries.Count);
+        Assert.Equal("aaaaaaaa-0000-0000-0000-000000000001", entries[0].SkuId);
+        Assert.Equal("bbbbbbbb-0000-0000-0000-000000000002", entries[1].SkuId);
+
+        // PowerPoint usa il primo (licenziato): il Visio non attivato non deve contare.
+        var (state, _) = OsppParser.Resolve(entries, ["AAAAAAAA-0000-0000-0000-000000000001"]);
+        Assert.Equal(PptLicenseState.Licensed, state);
+    }
+
     [Fact]
     public void Ospp_OutputReale_NotificationsComeNonAttivato()
     {
         var entries = OsppParser.Parse(RealOutput);
 
         var entry = Assert.Single(entries);
+        Assert.Equal(GraceSku, entry.SkuId);
         Assert.Equal("NOTIFICATIONS", entry.Status);
         Assert.Contains("grace period expired", entry.ErrorDescription);
 

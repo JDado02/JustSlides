@@ -170,7 +170,11 @@ public static class PowerPointCheck
                 _ = process.StandardError.ReadToEndAsync(timeout.Token);   // si svuota per non bloccare il processo
                 var output = await outputTask;
                 await process.WaitForExitAsync(timeout.Token);
-                return OsppParser.Summarize(OsppParser.Parse(output));
+                var entries = OsppParser.Parse(output);
+                var appSkus = ReadPowerPointSkus();
+                Log.Information("Verifica PowerPoint: OSPP elenca {Count} licenze ({Skus}); SKU in uso da PowerPoint: {Used}",
+                    entries.Count, string.Join(", ", entries.Select(e => e.SkuId ?? "?")), appSkus.Count == 0 ? "non letti" : string.Join(", ", appSkus));
+                return OsppParser.Resolve(entries, appSkus);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -188,6 +192,26 @@ public static class PowerPointCheck
         {
             Log.Warning(ex, "Verifica PowerPoint: lettura dell'attivazione non riuscita");
             return (PptLicenseState.Unknown, null);
+        }
+    }
+
+    /// <summary>
+    /// SKU della licenza che PowerPoint sta usando, dal registro dell'utente (valore non documentato da Microsoft, ma è ciò che Office
+    /// stesso scrive per sapere con quale licenza lavora ogni applicazione). Vuoto se non leggibile.
+    /// </summary>
+    private static IReadOnlyList<string> ReadPowerPointSkus()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Office\16.0\Common\Licensing\CurrentSkuIdAggregationForApp");
+            return key?.GetValue("PowerPoint") is string value
+                ? value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                : [];
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "SKU in uso da PowerPoint non leggibili");
+            return [];
         }
     }
 
