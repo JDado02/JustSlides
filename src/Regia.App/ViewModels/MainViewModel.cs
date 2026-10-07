@@ -5,6 +5,7 @@ using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Regia.App.Services;
+using Regia.Core.Input;
 using Regia.Core.Show;
 using Regia.Core.Media;
 using Regia.Core.Settings;
@@ -26,6 +27,7 @@ namespace Regia.App.ViewModels;
 public sealed partial class MainViewModel : ObservableObject
 {
     private readonly OutputHost _output;
+    private readonly KeyBindings _keys;
     private readonly ShowController _show;
     private readonly WaveController _wave;
     private readonly TappoTransitions _transitions;
@@ -85,11 +87,15 @@ public sealed partial class MainViewModel : ObservableObject
         WaveController wave,
         TappoTransitions transitions,
         ContentPresenterFactory factory,
-        PptHostClient ppt)
+        PptHostClient ppt,
+        ProgramViewModel program,
+        KeyBindings keys)
     {
+        _keys = keys;
         _output = output;
         _show = show;
         Preview = preview;
+        Program = program;
         _wave = wave;
         _transitions = transitions;
         _factory = factory;
@@ -177,6 +183,9 @@ public sealed partial class MainViewModel : ObservableObject
 
     public PreviewViewModel Preview { get; }
 
+    /// <summary>Cosa è in onda, prossima slide, etichette dei tasti.</summary>
+    public ProgramViewModel Program { get; }
+
     [ObservableProperty]
     private bool _showExcluded;
 
@@ -233,6 +242,17 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     public bool HasWarning => !string.IsNullOrEmpty(Warning);
+
+    /// <summary>Avviso rosso fisso: il monitor di output non c'è (cavo, proiettore, matrice). Null = tutto a posto.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasOutputLost))]
+    private string? _outputLostMessage;
+
+    /// <summary>L'output è perso: finestre nascoste, GO rifiutato finché non torna.</summary>
+    public bool HasOutputLost => !string.IsNullOrEmpty(OutputLostMessage);
+
+    /// <summary>Riposiziona le finestre di output e ricarica il Tappo (monitor tornato o cambiato).</summary>
+    public Task ReapplyOutputAsync() => ApplyOutputAsync();
 
     /// <summary>"Pagina N/M" per i PDF; vuoto per i contenuti senza pagine.</summary>
     public string PageText => _wave.Page is { } page
@@ -425,6 +445,13 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task GoAsync()
     {
+        if (HasOutputLost)
+        {
+            Warning = "GO rifiutato: " + OutputLostMessage;
+            Log.Warning("GO rifiutato: monitor di output non disponibile");
+            return;
+        }
+
         if (SelectedItem is null)
         {
             Log.Warning("Comando GO ignorato: nessun file selezionato");
@@ -593,6 +620,83 @@ public sealed partial class MainViewModel : ObservableObject
         _wave.Panic();
     }
 
+    private string? _keyboardWarning;
+
+    /// <summary>Avviso sull'hook di tastiera (non installato); null = tolto. Toglie solo il proprio testo, non quello di altri avvisi.</summary>
+    public void ShowKeyboardWarning(string? message)
+    {
+        if (message is not null)
+        {
+            _keyboardWarning = message;
+            Warning = message;
+        }
+        else
+        {
+            if (Warning == _keyboardWarning)
+                Warning = null;
+            _keyboardWarning = null;
+        }
+    }
+
+    /// <summary>
+    /// Esegue l'azione associata a un tasto (finestra della regia e hook globale passano da qui).
+    /// False = l'azione non si applica adesso e il tasto va lasciato a chi lo vuole (es. le frecce scorrono la lista a Tappo).
+    /// </summary>
+    public bool PerformKeyAction(KeyAction action)
+    {
+        switch (action)
+        {
+            case KeyAction.Go:
+                GoCommand.Execute(null);
+                return true;
+
+            case KeyAction.Panic:
+                PanicCommand.Execute(null);
+                return true;
+
+            case KeyAction.Next or KeyAction.Previous when State is WaveState.Tappo or WaveState.Errore:
+                return false;
+
+            case KeyAction.Next:
+                NextPageCommand.Execute(null);
+                return true;
+
+            case KeyAction.Previous:
+                PreviousPageCommand.Execute(null);
+                return true;
+
+            case KeyAction.SelectUp:
+                MoveSelection(-1);
+                return true;
+
+            case KeyAction.SelectDown:
+                MoveSelection(1);
+                return true;
+
+            case KeyAction.PlayPause:
+                if (IsVideoOnAir)
+                    TogglePauseCommand.Execute(null);
+                return true;
+
+            case KeyAction.Mute:
+                IsMuted = !IsMuted;
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>Sposta la selezione sulla lista visibile (salta le voci escluse nascoste); si ferma ai bordi.</summary>
+    private void MoveSelection(int delta)
+    {
+        var visible = ItemsView.Cast<MediaItem>().ToList();
+        var index = SelectedItem is null ? -1 : visible.IndexOf(SelectedItem);
+        var next = SelectionStep.Move(visible.Count, index, delta);
+        if (next >= 0 && next != index)
+            SelectedItem = visible[next];
+    }
+
     private void OnPageChanged()
     {
         OnPropertyChanged(nameof(PageText));
@@ -621,7 +725,10 @@ public sealed partial class MainViewModel : ObservableObject
             DisplayEnumerator.GetMonitors(),
             AudioDeviceEnumerator.GetOutputDevices(),
             ApplySettingsAsync,
-            () => _output.IdentifyMonitors(DisplayEnumerator.GetMonitors()));
+            () => _output.IdentifyMonitors(DisplayEnumerator.GetMonitors()))
+        {
+            Keys = new KeyBindingsViewModel(_keys)
+        };
     }
 
     /// <summary>Salva e applica le nuove impostazioni. Restituisce l'eventuale avviso per l'operatore.</summary>

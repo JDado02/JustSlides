@@ -5,13 +5,16 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Regia.App.Services;
 using Regia.App.ViewModels;
+using Regia.Core.Input;
 using Regia.Core.Logging;
 using Regia.Core.Media;
 using Regia.Core.Settings;
 using Regia.Core.Show;
 using Regia.Core.Wave;
 using Regia.Output;
+using Regia.Output.Capture;
 using Regia.Output.Content;
+using Regia.Output.Input;
 using Regia.Output.Interop;
 using Regia.Output.Ppt;
 using Regia.Output.Preflight;
@@ -27,6 +30,8 @@ public partial class App : Application
     private IHost? _host;
     private MainViewModel? _viewModel;
     private MainWindow? _mainWindow;
+    private KeyboardHook? _keyboardHook;
+    private OutputSupervisor? _outputSupervisor;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -62,6 +67,7 @@ public partial class App : Application
                     services.AddSingleton(showStore);
                     services.AddSingleton(show);
                     services.AddSingleton(settings);
+                    services.AddSingleton(new KeyBindings(new KeyMapStore(KeyMapStore.DefaultPath)));
                     services.AddSingleton<Scaletta>();
                     services.AddSingleton<VlcService>();
                     services.AddSingleton<PptHostClient>();
@@ -84,6 +90,8 @@ public partial class App : Application
                     });
                     services.AddSingleton<ShowController>();
                     services.AddSingleton<PreviewViewModel>();
+                    services.AddSingleton(sp => new OutputCaptureService(sp.GetRequiredService<OutputHost>(), Dispatcher));
+                    services.AddSingleton<ProgramViewModel>();
                     services.AddSingleton<MainViewModel>();
                     services.AddSingleton<MainWindow>();
                 })
@@ -102,6 +110,21 @@ public partial class App : Application
 
             await _viewModel.InitializeAsync();
 
+            StartKeyboardHook(_host.Services);
+
+            // Anteprima di ciò che è in onda: si ferma con la regia ridotta a icona.
+            var capture = _host.Services.GetRequiredService<OutputCaptureService>();
+            _mainWindow.StateChanged += (_, _) => capture.Paused = _mainWindow.WindowState == WindowState.Minimized;
+            capture.Start();
+
+            // Hotplug del monitor di output (solo in modalità reale).
+            _outputSupervisor = new OutputSupervisor(
+                _host.Services.GetRequiredService<OutputHost>(),
+                _host.Services.GetRequiredService<WaveController>(),
+                _viewModel,
+                Dispatcher);
+            _outputSupervisor.Start();
+
             // La finestra di simulazione, se c'è, ha rubato il focus: lo restituisco alla regia.
             _mainWindow.Activate();
         }
@@ -114,11 +137,51 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// Tasti globali condizionati: attivi solo con un'uscita o lo slideshow di PowerPoint in primo piano (clicker del relatore,
+    /// clic sullo slideshow). Con la regia in primo piano ci pensa la finestra stessa; con altre app non si tocca nulla.
+    /// </summary>
+    private void StartKeyboardHook(IServiceProvider services)
+    {
+        try
+        {
+            var keys = services.GetRequiredService<KeyBindings>();
+            var output = services.GetRequiredService<OutputHost>();
+            var ppt = services.GetRequiredService<PptHostClient>();
+            var viewModel = services.GetRequiredService<MainViewModel>();
+
+            _keyboardHook = new KeyboardHook(
+                Dispatcher,
+                () => keys.Current,
+                (hwnd, pid) => output.ClassifyForeground(hwnd, pid, ppt.PowerPointPid),
+                (action, repeat) =>
+                {
+                    // Tenere premuto il tasto non deve mandare in onda a raffica.
+                    if (repeat && action == KeyAction.Go)
+                        return;
+
+                    viewModel.PerformKeyAction(action);
+                });
+
+            _keyboardHook.WarningChanged += message => viewModel.ShowKeyboardWarning(message);
+            if (!_keyboardHook.IsInstalled)
+                viewModel.ShowKeyboardWarning("Tasti globali non attivi: il clicker funziona solo con la finestra della regia in primo piano.");
+        }
+        catch (Exception ex)
+        {
+            // Senza hook la regia funziona lo stesso (tasti locali): mai bloccare l'avvio per questo.
+            Log.Error(ex, "Impossibile avviare l'hook di tastiera");
+        }
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
         try
         {
             Log.Information("=== Chiusura Regia ===");
+            _keyboardHook?.Dispose();
+            _outputSupervisor?.Dispose();
+            _host?.Services.GetService<OutputCaptureService>()?.Dispose();
             _host?.Services.GetService<ShowController>()?.Dispose(); // ultimo salvataggio dello show
             _host?.Services.GetService<PptHostClient>()?.Dispose();
             _host?.Services.GetService<OutputHost>()?.Dispose();

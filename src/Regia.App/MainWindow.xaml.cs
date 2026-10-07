@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using Regia.App.ViewModels;
+using Regia.Core.Input;
 using Regia.Core.Media;
 using Regia.Core.Wave;
 
@@ -13,26 +14,36 @@ namespace Regia.App;
 public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
+    private readonly KeyBindings _keys;
 
-    public MainWindow(MainViewModel viewModel)
+    public MainWindow(MainViewModel viewModel, KeyBindings keys)
     {
         InitializeComponent();
         _viewModel = viewModel;
+        _keys = keys;
         DataContext = viewModel;
+
+        // Con Q/A (o le frecce) la selezione può uscire dalla zona visibile: si riporta in vista.
+        ScalettaList.SelectionChanged += (_, _) =>
+        {
+            if (ScalettaList.SelectedItem is { } selected)
+                ScalettaList.ScrollIntoView(selected);
+        };
     }
 
     /// <summary>Permette la chiusura senza conferma (usata allo spegnimento controllato).</summary>
     public bool SkipCloseConfirmation { get; set; }
 
-    // Tasti locali alla finestra di regia. Gli hotkey globali arrivano nella Milestone 7.
+    // Tasti con la regia in primo piano; con il focus altrove (clicker, slideshow) arrivano dall'hook di tastiera.
+    // Le associazioni tasto → azione sono in KeyMap (impostazioni).
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
         base.OnPreviewKeyDown(e);
 
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
-        var ctrlShift = Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift);
+        var chord = KeyChordInput.FromKey(key, Keyboard.Modifiers);
 
-        // Si sta scrivendo in un campo (sessione, relatore): Spazio, Invio e frecce sono del campo, non GO o pagina.
+        // Si sta scrivendo in un campo (sessione, relatore): lettere, Spazio, Invio e frecce sono del campo, non azioni.
         // PANIC (Esc) resta sempre attivo. Invio conferma il testo e restituisce il focus alla scaletta.
         if (Keyboard.FocusedElement is TextBox box && key != Key.Escape)
         {
@@ -46,35 +57,26 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (key == Key.Escape)
-        {
-            _viewModel.PanicCommand.Execute(null);
-            e.Handled = true;
-        }
-        else if (key is Key.Space or Key.Enter && Keyboard.Modifiers == ModifierKeys.None)
-        {
-            _viewModel.GoCommand.Execute(null);
-            e.Handled = true;
-        }
-        else if (Keyboard.Modifiers == ModifierKeys.None && IsPageKey(key) && _viewModel.State is not (WaveState.Tappo or WaveState.Errore))
-        {
-            // Frecce / PageUp / PageDown: pagina o slide (solo con qualcosa in onda; altrimenti scorrono la lista).
-            if (key is Key.Right or Key.Down or Key.PageDown)
-                _viewModel.NextPageCommand.Execute(null);
-            else
-                _viewModel.PreviousPageCommand.Execute(null);
-
-            e.Handled = true;
-        }
-        else if (key == Key.F12 && ctrlShift)
+        if (key == Key.F12 && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
             _viewModel.SimulateErrorCommand.Execute(null);
             e.Handled = true;
+            return;
         }
-    }
 
-    private static bool IsPageKey(Key key) =>
-        key is Key.Right or Key.Left or Key.Down or Key.Up or Key.PageDown or Key.PageUp;
+        if (_keys.Current.Find(chord) is not { } action)
+            return;
+
+        // Tenere premuto il tasto non deve mandare in onda a raffica.
+        if (e.IsRepeat && action == KeyAction.Go)
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (_viewModel.PerformKeyAction(action))
+            e.Handled = true;
+    }
 
     protected override void OnClosing(CancelEventArgs e)
     {

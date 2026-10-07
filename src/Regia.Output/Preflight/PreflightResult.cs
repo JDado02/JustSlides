@@ -9,6 +9,12 @@ public sealed record PreflightResult(
     IReadOnlyList<string> Details,
     byte[]? ThumbnailJpeg = null)
 {
+    /// <summary>Titoli di tutte le slide (solo PowerPoint); vuoto per il resto.</summary>
+    public IReadOnlyList<string> SlideTitles { get; init; } = [];
+
+    /// <summary>Numeri (1-based) delle slide nascoste (solo PowerPoint).</summary>
+    public IReadOnlyList<int> HiddenSlides { get; init; } = [];
+
     public static PreflightResult Error(string summary, params string[] details) =>
         new(PreflightStatus.Error, summary, details);
 

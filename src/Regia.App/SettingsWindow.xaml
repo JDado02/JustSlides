@@ -80,6 +80,77 @@
                   VerticalAlignment="Center" />
         </DockPanel>
         <CheckBox Margin="0,8,0,0" IsChecked="{Binding HardCut}" Content="Taglio secco (nessuna dissolvenza)" />
+
+        <!-- Tasti: globali dell'app, si salvano subito -->
+        <TextBlock Text="Tasti" FontSize="16" FontWeight="SemiBold" Margin="0,22,0,6" />
+        <TextBlock Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,8"
+                   Text="Valgono per tutta l'app (non per l'evento) e si salvano subito. Funzionano anche con il focus sullo slideshow o sul clicker del relatore. Esc è sempre PANIC." />
+        <ItemsControl ItemsSource="{Binding Keys.Rows}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Grid Margin="0,3">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="190" />
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                  <ItemsControl ItemsSource="{Binding Chips}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <WrapPanel />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Border Background="#FF2A2F3A" BorderBrush="#FF454C5C" BorderThickness="1" CornerRadius="4"
+                                Padding="8,2" Margin="0,2,6,2">
+                          <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Text}" VerticalAlignment="Center" FontWeight="SemiBold" />
+                            <Button Content="&#215;" Padding="6,0" Margin="6,0,0,0" FontSize="14" MinWidth="0"
+                                    Command="{Binding DataContext.Keys.RemoveCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="{Binding}" ToolTip="Togli questo tasto">
+                              <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                  <Style.Triggers>
+                                    <DataTrigger Binding="{Binding CanRemove}" Value="False">
+                                      <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                  </Style.Triggers>
+                                </Style>
+                              </Button.Style>
+                            </Button>
+                          </StackPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock Text="premi un tasto..." Foreground="#FFFFD79A" VerticalAlignment="Center" Margin="4,0,0,0">
+                    <TextBlock.Style>
+                      <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding IsCapturing}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </TextBlock.Style>
+                  </TextBlock>
+                </StackPanel>
+                <Button Grid.Column="2" Content="+ Aggiungi" Padding="10,3" Margin="8,0,0,0"
+                        Command="{Binding DataContext.Keys.StartCaptureCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                        CommandParameter="{Binding}" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <DockPanel Margin="0,8,0,0">
+          <Button DockPanel.Dock="Left" Content="Ripristina predefiniti" Command="{Binding Keys.ResetDefaultsCommand}" Padding="10,4" />
+          <TextBlock Text="{Binding Keys.Status}" TextWrapping="Wrap" VerticalAlignment="Center"
+                     Foreground="{StaticResource MutedBrush}" Margin="12,0,0,0" />
+        </DockPanel>
       </StackPanel>
     </ScrollViewer>
 

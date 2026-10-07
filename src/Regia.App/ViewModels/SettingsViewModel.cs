@@ -39,6 +39,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly Action _identify;
     private readonly AppSettings _current;
 
+    /// <summary>Editor dei tasti: globali dell'app, si salvano subito (non passano da "Applica").</summary>
+    public KeyBindingsViewModel? Keys { get; init; }
+
     [ObservableProperty]
     private MonitorItem? _selectedMonitor;
 

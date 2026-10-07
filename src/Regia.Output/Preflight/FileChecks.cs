@@ -201,10 +201,14 @@ public static class FileChecks
         if (info.Fonts.Count > 0)
             details.Add("Font usati: " + string.Join(", ", info.Fonts));
 
+        if (info.HiddenSlides > 0)
+            details.Add($"Slide nascoste (non vanno in onda): {info.HiddenSlides}");
+
         var summary = $"{info.Slides} slide · {info.AspectText}";
-        return warnings.Count > 0
+        var result = warnings.Count > 0
             ? PreflightResult.Warning(summary + " · " + warnings[0], details, info.Thumbnail)
             : PreflightResult.Ok(summary, details, info.Thumbnail);
+        return result with { SlideTitles = info.SlideTitles, HiddenSlides = info.HiddenSlideNumbers };
     }
 
     private static bool IsZip(string path)

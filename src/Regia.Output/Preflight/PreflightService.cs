@@ -134,6 +134,8 @@ public sealed class PreflightService : IDisposable
             item.Preflight = result.Status;
             item.PreflightSummary = result.Summary;
             item.PreflightDetails = result.Details;
+            item.SlideTitles = result.SlideTitles;
+            item.HiddenSlides = result.HiddenSlides;
             if (thumbPath is not null)
                 item.ThumbnailPath = thumbPath;
 

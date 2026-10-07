@@ -2,6 +2,7 @@ using System.IO;
 using Regia.Core.Monitors;
 using Regia.Core.Settings;
 using Regia.Output.Content;
+using Regia.Output.Input;
 using Regia.Output.Interop;
 using Regia.Output.Tappo;
 using Regia.Output.Transitions;
@@ -28,6 +29,7 @@ public sealed class OutputHost : IDisposable
     private int _tappoLoadVersion;
     private bool _shown;
     private nint _showWindow;
+    private bool _showAttached;
 
     public OutputHost(VlcService vlc)
     {
@@ -190,6 +192,21 @@ public sealed class OutputHost : IDisposable
         WindowPlacement.SetOwner(Tappo, Content);
     }
 
+    /// <summary>
+    /// Il monitor di output è sparito: Windows sposta da solo le finestre sul monitor della regia e le lascerebbe lì a
+    /// coprirla. Si nascondono; <see cref="ApplyAsync"/> le rimostra e riposiziona quando l'output torna.
+    /// </summary>
+    public void Suspend()
+    {
+        if (!_shown)
+            return;
+
+        _shown = false;
+        TryClose(() => Tappo.Hide());
+        TryClose(() => Content.Hide());
+        Log.Warning("Finestre di output nascoste: monitor di output non disponibile");
+    }
+
     private void ShowWindows()
     {
         if (_shown)
@@ -227,6 +244,7 @@ public sealed class OutputHost : IDisposable
     /// </summary>
     public void AttachShowWindow(long hwnd)
     {
+        _showAttached = true;
         _showWindow = (nint)hwnd;
         Log.Information("Slideshow sotto il Tappo (finestra 0x{Hwnd:X})", hwnd);
         if (!_shown)
@@ -248,6 +266,7 @@ public sealed class OutputHost : IDisposable
     /// <summary>Lo slideshow è finito: la finestra Contenuto torna a pieno schermo e il Tappo sopra di lei.</summary>
     public void DetachShowWindow()
     {
+        _showAttached = false;
         if (_showWindow == 0)
             return;
 
@@ -289,6 +308,24 @@ public sealed class OutputHost : IDisposable
     }
 
     /// <summary>
+    /// Per l'hook di tastiera: la finestra in primo piano è una nostra finestra di output, o lo slideshow di PowerPoint
+    /// (processo <paramref name="powerPointPid"/>, quello avviato da noi) mentre è sotto il Tappo?
+    /// Chiamato a ogni tasto: nessun lavoro, solo confronti.
+    /// </summary>
+    public ForegroundKind ClassifyForeground(nint hwnd, uint pid, int powerPointPid)
+    {
+        if (!_shown)
+            return ForegroundKind.Other;
+
+        if (hwnd == HandleOf(Content) || hwnd == HandleOf(Tappo) || (_simulation is { } frame && hwnd == HandleOf(frame)))
+            return ForegroundKind.OutputWindow;
+
+        return _showAttached && powerPointPid > 0 && pid == (uint)powerPointPid ? ForegroundKind.SlideShow : ForegroundKind.Other;
+    }
+
+    private static nint HandleOf(System.Windows.Window window) => new System.Windows.Interop.WindowInteropHelper(window).Handle;
+
+    /// <summary>
     /// Finché il valore restituito non viene eliminato, il Tappo viene riportato in cima a ogni cambio di finestra in primo
     /// piano. Da usare mentre uno slideshow di PowerPoint (altro processo) è sotto il Tappo.
     /// </summary>
@@ -309,6 +346,17 @@ public sealed class OutputHost : IDisposable
 
         return (CurrentRect(), null, true);
     }
+
+    /// <summary>
+    /// Area dello schermo che la cattura del Program deve riprendere: il monitor di output o, in simulazione, l'area utile
+    /// della cornice. Null se le finestre di output non sono mostrate o la cornice è ridotta a icona (nulla da catturare).
+    /// Da chiamare sul thread UI.
+    /// </summary>
+    public PixelRect? CaptureRect =>
+        !_shown ? null
+        : Mode == OutputMode.Real && CurrentMonitor is { } monitor ? PixelRect.FromMonitor(monitor)
+        : Mode == OutputMode.Simulation ? _simulation?.GetViewportRect()
+        : null;
 
     private PixelRect CurrentRect()
     {

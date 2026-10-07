@@ -58,6 +58,22 @@
 
     <!-- Avvisi: generico, audio (PowerPoint), cartella contenuti -->
     <StackPanel Grid.Row="1">
+      <!-- Output scollegato (rosso, fisso finché il monitor non torna) -->
+      <Border Background="#FF5A1010" BorderBrush="#FFC62828" BorderThickness="1" CornerRadius="6"
+              Padding="12,8" Margin="0,0,0,8">
+        <Border.Style>
+          <Style TargetType="Border">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding HasOutputLost}" Value="True">
+                <Setter Property="Visibility" Value="Visible" />
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </Border.Style>
+        <TextBlock Text="{Binding OutputLostMessage}" TextWrapping="Wrap" Foreground="#FFFFD0D0" FontSize="15" FontWeight="SemiBold" />
+      </Border>
+
       <Border Background="#FF4A2B00" BorderBrush="#FFB26A00" BorderThickness="1" CornerRadius="6"
               Padding="12,8" Margin="0,0,0,8">
         <Border.Style>
@@ -363,6 +379,12 @@
 
         <!-- Program (provvisorio fino alla M7): stato, pagina/slide, video, audio, GO, PANIC -->
         <StackPanel Grid.Row="2">
+          <!-- Cosa è DAVVERO sul monitor di output (cattura a ~5 fps) -->
+          <Border Background="#FF0F1115" CornerRadius="6" Height="150" Margin="0,0,0,10" ClipToBounds="True"
+                  ToolTip="Ciò che si vede ora sul monitor di output (aggiornato 5 volte al secondo)">
+            <Image Source="{Binding Program.CaptureImage}" Stretch="Uniform" />
+          </Border>
+
           <Border CornerRadius="10" MinHeight="84" Margin="0,0,0,10">
             <Border.Style>
               <Style TargetType="Border">
@@ -386,8 +408,13 @@
                 </Style.Triggers>
               </Style>
             </Border.Style>
-            <TextBlock Text="{Binding StateText}" FontSize="40" FontWeight="Bold" Foreground="White"
-                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12,6">
+              <TextBlock Text="{Binding StateText}" FontSize="40" FontWeight="Bold" Foreground="White"
+                         HorizontalAlignment="Center" />
+              <TextBlock Text="{Binding Program.OnAirName}" FontSize="16" Foreground="White" Opacity="0.9"
+                         HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="520"
+                         Style="{StaticResource HideWhenEmpty}" />
+            </StackPanel>
           </Border>
 
           <!-- Pagina N/M per i PDF e frecce -->
@@ -412,6 +439,9 @@
                        HorizontalAlignment="Center" VerticalAlignment="Center" />
             <Button Grid.Column="2" Content="&#9654;" Command="{Binding NextPageCommand}" FontSize="22" />
           </Grid>
+          <TextBlock Text="{Binding Program.NextText}" FontSize="20" FontWeight="SemiBold" Margin="0,-2,0,10"
+                     HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"
+                     Foreground="{StaticResource MutedBrush}" Style="{StaticResource HideWhenEmpty}" />
 
           <!-- Video in onda: countdown, play/pausa, volume, scorrimento -->
           <Border Background="{StaticResource PanelBrush}" CornerRadius="8" Padding="14,10" Margin="0,0,0,10">
@@ -492,7 +522,7 @@
             </Grid.ColumnDefinitions>
             <Button Grid.Column="0" Command="{Binding GoCommand}" Background="{StaticResource GoBrush}"
                     FontSize="22" FontWeight="SemiBold" Padding="14,16">
-              <TextBlock Text="GO  (Spazio / Invio)" Foreground="White" />
+              <TextBlock Text="{Binding Program.GoLabel}" Foreground="White" />
             </Button>
             <Button Grid.Column="2" Command="{Binding BackToTappoCommand}" FontSize="22" Padding="14,16">
               <TextBlock Text="TORNA AL TAPPO" Foreground="White" />
@@ -500,7 +530,7 @@
           </Grid>
 
           <Button Command="{Binding PanicCommand}" Background="#FFB71C1C" Padding="14,22">
-            <TextBlock Text="PANIC  (Esc)" FontSize="32" FontWeight="Bold" Foreground="White" />
+            <TextBlock Text="{Binding Program.PanicLabel}" FontSize="32" FontWeight="Bold" Foreground="White" />
           </Button>
         </StackPanel>
       </Grid>

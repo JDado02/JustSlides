@@ -196,6 +196,15 @@ public sealed class MediaItem : INotifyPropertyChanged
         set => Set(ref _preflightDetails, value ?? []);
     }
 
+    /// <summary>
+    /// Titoli di tutte le slide di un PowerPoint, dal pre-flight (indice 0 = slide 1). Vuoto se non ancora letti o non
+    /// leggibili: il Program mostra allora solo il numero. Non si salva nello show, si rilegge.
+    /// </summary>
+    public IReadOnlyList<string> SlideTitles { get; set; } = [];
+
+    /// <summary>Numeri (1-based) delle slide nascoste di un PowerPoint: PowerPoint le salta. Dal pre-flight, non si salva.</summary>
+    public IReadOnlyList<int> HiddenSlides { get; set; } = [];
+
     /// <summary>File della miniatura nella cache dello show; null = nessuna.</summary>
     public string? ThumbnailPath
     {

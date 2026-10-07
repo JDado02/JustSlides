@@ -12,6 +12,18 @@ public sealed record PptxInfo(
     IReadOnlyList<string> MissingLinks,
     byte[]? Thumbnail)
 {
+    /// <summary>
+    /// Titolo di OGNI slide, nell'ordine del file (indice 0 = slide 1; PowerPoint numera così anche con slide nascoste);
+    /// vuoto dove la slide non ha un titolo. Lista vuota se non leggibile: la regia mostra solo il numero.
+    /// </summary>
+    public IReadOnlyList<string> SlideTitles { get; init; } = [];
+
+    /// <summary>Numeri (1-based) delle slide nascoste: PowerPoint le salta e non vanno in onda.</summary>
+    public IReadOnlyList<int> HiddenSlideNumbers { get; init; } = [];
+
+    /// <summary>Quante slide sono nascoste.</summary>
+    public int HiddenSlides => HiddenSlideNumbers.Count;
+
     /// <summary>Rapporto larghezza/altezza (0 se sconosciuto).</summary>
     public double AspectRatio => HeightEmu > 0 ? WidthEmu / HeightEmu : 0;
 
@@ -36,6 +48,7 @@ public static class PptxInspector
     private static readonly XNamespace A = "http://schemas.openxmlformats.org/drawingml/2006/main";
     private static readonly XNamespace P = "http://schemas.openxmlformats.org/presentationml/2006/main";
     private static readonly XNamespace R = "http://schemas.openxmlformats.org/package/2006/relationships";
+    private static readonly XNamespace RDoc = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 
     /// <exception cref="InvalidDataException">Il file non è un pacchetto PowerPoint valido.</exception>
     public static PptxInfo Inspect(string path, Func<string, bool>? fileExists = null)
@@ -114,7 +127,90 @@ public static class PptxInspector
             thumbnail = ms.ToArray();
         }
 
-        return new PptxInfo(slides, width, height, fonts.ToList(), missing.ToList(), thumbnail);
+        var (titles, hidden) = ReadTitles(zip, presentation);
+
+        return new PptxInfo(slides, width, height, fonts.ToList(), missing.ToList(), thumbnail)
+        {
+            SlideTitles = titles,
+            HiddenSlideNumbers = hidden
+        };
+    }
+
+    private const int MaxTitleLength = 120;
+
+    /// <summary>
+    /// Titoli di tutte le slide e numeri delle nascoste, nell'ordine di <c>sldIdLst</c>. Solo un di più per l'operatore:
+    /// qualunque cosa non torni (relazioni mancanti, XML anomalo) dà liste vuote, mai un errore del pre-flight.
+    /// </summary>
+    private static (IReadOnlyList<string> Titles, IReadOnlyList<int> Hidden) ReadTitles(ZipArchive zip, XDocument presentation)
+    {
+        try
+        {
+            var rels = Load(zip, "ppt/_rels/presentation.xml.rels");
+            if (rels is null)
+                return ([], []);
+
+            var targets = new Dictionary<string, string>();
+            foreach (var rel in rels.Descendants(R + "Relationship"))
+            {
+                var relId = (string?)rel.Attribute("Id");
+                var target = (string?)rel.Attribute("Target");
+                if (relId is null || target is null)
+                    continue;
+
+                if (!targets.TryAdd(relId, target))
+                    return ([], []); // relazioni ambigue: meglio nessun titolo che titoli sulle slide sbagliate
+            }
+
+            var titles = new List<string>();
+            var hidden = new List<int>();
+            foreach (var id in presentation.Descendants(P + "sldId").Select(s => (string?)s.Attribute(RDoc + "id")))
+            {
+                if (id is null || !targets.TryGetValue(id, out var slideTarget))
+                    return ([], []); // ordine non ricostruibile: meglio nessun titolo che titoli sulle slide sbagliate
+
+                var name = slideTarget.StartsWith('/') ? slideTarget.TrimStart('/') : "ppt/" + slideTarget;
+                var slide = Load(zip, name);
+                if (slide?.Root is null)
+                    return ([], []);
+
+                titles.Add(TitleOf(slide));
+                if ((string?)slide.Root.Attribute("show") == "0")
+                    hidden.Add(titles.Count);
+            }
+
+            return (titles, hidden);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or System.Xml.XmlException)
+        {
+            return ([], []);
+        }
+    }
+
+    /// <summary>Testo del segnaposto titolo (title / ctrTitle) di una slide, su una riga; vuoto se non c'è.</summary>
+    private static string TitleOf(XDocument slide)
+    {
+        foreach (var shape in slide.Descendants(P + "sp"))
+        {
+            var type = (string?)shape.Element(P + "nvSpPr")?.Element(P + "nvPr")?.Element(P + "ph")?.Attribute("type");
+            if (type is not ("title" or "ctrTitle"))
+                continue;
+
+            var text = new System.Text.StringBuilder();
+            foreach (var part in shape.Descendants().Where(e => e.Name == A + "t" || e.Name == A + "br" || e.Name == A + "p"))
+            {
+                // Paragrafi e a-capo diventano uno spazio: il titolo sta su una riga.
+                if (part.Name == A + "t")
+                    text.Append(part.Value);
+                else
+                    text.Append(' ');
+            }
+
+            var line = string.Join(' ', text.ToString().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+            return line.Length > MaxTitleLength ? line[..(MaxTitleLength - 1)] + "…" : line;
+        }
+
+        return "";
     }
 
     private static bool IsFontSource(string name) =>
