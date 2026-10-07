@@ -240,9 +240,18 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void RemoveSelected()
     {
-        // Il file in onda non si toglie dalla lista: la regia lo sta ancora usando.
-        if (SelectedItem is null || SelectedItem.Kind == MediaKind.TestPattern || ReferenceEquals(SelectedItem, _wave.CurrentItem))
+        if (SelectedItem is null || SelectedItem.Kind == MediaKind.TestPattern)
             return;
+
+        // Il file in onda non si toglie dalla lista: la regia lo sta ancora usando.
+        if (ReferenceEquals(SelectedItem, _wave.CurrentItem))
+        {
+            Log.Warning("Rimozione rifiutata: {Item} è in onda", SelectedItem.DisplayName);
+            MessageBox.Show(Application.Current?.MainWindow!,
+                $"\"{SelectedItem.DisplayName}\" è in onda e non può essere rimosso.\n\nRiporta prima la regia al Tappo, poi rimuovilo.",
+                "Contenuto in onda", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
 
         var index = Items.IndexOf(SelectedItem);
         Items.Remove(SelectedItem);
