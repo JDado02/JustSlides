@@ -12,7 +12,7 @@
 
     <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
       <StackPanel>
-        <TextBlock Text="Monitor di output" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,6" />
+        <TextBlock Text="Monitor di output" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,6" />
         <ListBox ItemsSource="{Binding Monitors}" SelectedItem="{Binding SelectedMonitor}" MinHeight="90">
           <ListBox.ItemContainerStyle>
             <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
@@ -34,7 +34,7 @@
 
         <CheckBox Margin="0,18,0,0" IsChecked="{Binding SimulationMode}"
                   Content="Modalità simulazione (output in una finestra sul monitor principale)" />
-        <TextBlock Foreground="#FFFFD79A" TextWrapping="Wrap" Margin="0,6,0,0" Text="{Binding SimulationFallbackNote}">
+        <TextBlock Foreground="{StaticResource WarnTextBrush}" TextWrapping="Wrap" Margin="0,6,0,0" Text="{Binding SimulationFallbackNote}">
           <TextBlock.Style>
             <Style TargetType="TextBlock">
               <Setter Property="Visibility" Value="Collapsed" />
@@ -47,7 +47,7 @@
           </TextBlock.Style>
         </TextBlock>
 
-        <TextBlock Text="Cartella contenuti" FontSize="16" FontWeight="SemiBold" Margin="0,22,0,6" />
+        <TextBlock Text="Cartella contenuti" FontSize="15" FontWeight="SemiBold" Margin="0,22,0,6" />
         <DockPanel>
           <Button DockPanel.Dock="Right" Content="Sfoglia..." Margin="8,0,0,0" Command="{Binding BrowseSourceFolderCommand}" />
           <TextBox Text="{Binding SourceFolder, UpdateSourceTrigger=PropertyChanged}" />
@@ -55,7 +55,7 @@
         <TextBlock Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,0"
                    Text="I file messi qui (anche nelle sottocartelle, che diventano le sessioni) compaiono da soli in scaletta. La regia lavora sempre su una copia locale: la cartella può stare in rete o su chiavetta." />
 
-        <TextBlock Text="Tappo" FontSize="16" FontWeight="SemiBold" Margin="0,22,0,6" />
+        <TextBlock Text="Tappo" FontSize="15" FontWeight="SemiBold" Margin="0,22,0,6" />
         <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
           <RadioButton Content="Immagine" IsChecked="{Binding IsImageTappo}" GroupName="TappoKind" />
           <RadioButton Content="Video in loop" IsChecked="{Binding IsVideoTappo}" GroupName="TappoKind" />
@@ -65,12 +65,12 @@
           <TextBox Text="{Binding TappoPath, UpdateSourceTrigger=PropertyChanged}" />
         </DockPanel>
 
-        <TextBlock Text="Uscita audio" FontSize="16" FontWeight="SemiBold" Margin="0,22,0,6" />
+        <TextBlock Text="Uscita audio" FontSize="15" FontWeight="SemiBold" Margin="0,22,0,6" />
         <ListBox ItemsSource="{Binding AudioDevices}" SelectedItem="{Binding SelectedAudioDevice}"
                  DisplayMemberPath="Display" MinHeight="70" MaxHeight="150" />
         <TextBlock Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,0"
                    Text="Vale per i video. PowerPoint suona sempre sul dispositivo predefinito di Windows (il volume e il Mute della regia agiscono comunque sul suo audio)." />
-        <TextBlock Foreground="#FFFFD79A" TextWrapping="Wrap" Margin="0,6,0,0" Text="{Binding PptAudioNote}">
+        <TextBlock Foreground="{StaticResource WarnTextBrush}" TextWrapping="Wrap" Margin="0,6,0,0" Text="{Binding PptAudioNote}">
           <TextBlock.Style>
             <Style TargetType="TextBlock">
               <Setter Property="Visibility" Value="Collapsed" />
@@ -83,7 +83,7 @@
           </TextBlock.Style>
         </TextBlock>
 
-        <TextBlock Text="Dissolvenza" FontSize="16" FontWeight="SemiBold" Margin="0,22,0,6" />
+        <TextBlock Text="Dissolvenza" FontSize="15" FontWeight="SemiBold" Margin="0,22,0,6" />
         <DockPanel>
           <TextBlock DockPanel.Dock="Right" Width="70" TextAlignment="Right" VerticalAlignment="Center"
                      Text="{Binding FadeDurationMs, StringFormat={}{0:0} ms}" />
@@ -94,7 +94,7 @@
         <CheckBox Margin="0,8,0,0" IsChecked="{Binding HardCut}" Content="Taglio secco (nessuna dissolvenza)" />
 
         <!-- Tasti: globali dell'app, si salvano subito -->
-        <TextBlock Text="Tasti" FontSize="16" FontWeight="SemiBold" Margin="0,22,0,6" />
+        <TextBlock Text="Tasti" FontSize="15" FontWeight="SemiBold" Margin="0,22,0,6" />
         <TextBlock Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,8"
                    Text="Valgono per tutta l'app (non per l'evento) e si salvano subito. Funzionano anche con il focus sullo slideshow o sul clicker del relatore. Esc è sempre PANIC." />
         <ItemsControl ItemsSource="{Binding Keys.Rows}">
@@ -116,7 +116,7 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                       <DataTemplate>
-                        <Border Background="#FF2A2F3A" BorderBrush="#FF454C5C" BorderThickness="1" CornerRadius="4"
+                        <Border Background="{StaticResource RaisedBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="4"
                                 Padding="8,2" Margin="0,2,6,2">
                           <StackPanel Orientation="Horizontal">
                             <TextBlock Text="{Binding Text}" VerticalAlignment="Center" FontWeight="SemiBold" />
@@ -138,7 +138,7 @@
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
-                  <TextBlock Text="premi un tasto..." Foreground="#FFFFD79A" VerticalAlignment="Center" Margin="4,0,0,0">
+                  <TextBlock Text="premi un tasto..." Foreground="{StaticResource WarnTextBrush}" VerticalAlignment="Center" Margin="4,0,0,0">
                     <TextBlock.Style>
                       <Style TargetType="TextBlock">
                         <Setter Property="Visibility" Value="Collapsed" />
@@ -168,7 +168,7 @@
 
     <DockPanel Grid.Row="1" Margin="0,16,0,0">
       <Button DockPanel.Dock="Right" Content="Chiudi" Margin="8,0,0,0" Click="OnCloseClick" />
-      <Button DockPanel.Dock="Right" Content="Applica" Background="#FF1F5FBF" Command="{Binding ApplyCommand}" />
+      <Button DockPanel.Dock="Right" Content="Applica" Background="{StaticResource TappoBrush}" Command="{Binding ApplyCommand}" />
       <TextBlock Text="{Binding Status}" TextWrapping="Wrap" VerticalAlignment="Center"
                  Foreground="{StaticResource MutedBrush}" Margin="0,0,12,0" />
     </DockPanel>
