@@ -1,4 +1,8 @@
-# JustSlides
+<p align="center">
+  <img src="docs/logo.png" alt="JustSlides" width="160">
+</p>
+
+<h1 align="center">JustSlides</h1>
 
 > ## ⬇️ [Scarica JustSlides-Setup.exe](https://github.com/JDado02/JustSlides/releases/latest/download/JustSlides-Setup.exe)
 > Doppio clic sul file scaricato e segui la procedura (italiano, senza diritti di amministratore, il runtime .NET 10 è incluso).
