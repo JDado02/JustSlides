@@ -1,9 +1,13 @@
 <Window x:Class="Regia.App.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ppt="clr-namespace:Regia.Core.Ppt;assembly=Regia.Core"
         Style="{StaticResource {x:Type Window}}"
         Title="Impostazioni evento" Width="640" Height="700" MinWidth="520" MinHeight="560"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <Window.Resources>
+    <BooleanToVisibilityConverter x:Key="BoolToVis" />
+  </Window.Resources>
   <Grid Margin="20">
     <Grid.RowDefinitions>
       <RowDefinition Height="*" />
@@ -82,6 +86,56 @@
             </Style>
           </TextBlock.Style>
         </TextBlock>
+
+        <!-- Verifica PowerPoint: solo su richiesta (nessun controllo all'avvio) -->
+        <TextBlock Text="PowerPoint" FontSize="15" FontWeight="SemiBold" Margin="0,22,0,6" />
+        <TextBlock Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,8"
+                   Text="Controlla che PowerPoint sia installato, attivato e pronto per la regia, con una prova di pochi secondi (avvia PowerPoint, crea, salva e riapre una presentazione di prova). Si fa solo con la regia a Tappo." />
+        <Button Content="{Binding PptCheckButtonText}" Command="{Binding VerifyPptCommand}" HorizontalAlignment="Left" Padding="16,8" />
+        <Border Margin="0,10,0,0" CornerRadius="6" Padding="12,10" BorderThickness="1"
+                Visibility="{Binding HasPptCheckResult, Converter={StaticResource BoolToVis}}">
+          <Border.Style>
+            <Style TargetType="Border">
+              <Setter Property="Background" Value="{StaticResource OkBgBrush}" />
+              <Setter Property="BorderBrush" Value="{StaticResource OkBorderBrush}" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding PptCheckLevel}" Value="{x:Static ppt:PptCheckLevel.Warning}">
+                  <Setter Property="Background" Value="{StaticResource WarnBgBrush}" />
+                  <Setter Property="BorderBrush" Value="{StaticResource WarnBorderBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding PptCheckLevel}" Value="{x:Static ppt:PptCheckLevel.Error}">
+                  <Setter Property="Background" Value="{StaticResource DangerBgBrush}" />
+                  <Setter Property="BorderBrush" Value="{StaticResource DangerBorderBrush}" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </Border.Style>
+          <StackPanel>
+            <TextBlock Text="{Binding PptCheckSummary}" TextWrapping="Wrap" FontWeight="SemiBold">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                  <Setter Property="Foreground" Value="{StaticResource OkTextBrush}" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding PptCheckLevel}" Value="{x:Static ppt:PptCheckLevel.Warning}">
+                      <Setter Property="Foreground" Value="{StaticResource WarnTextBrush}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding PptCheckLevel}" Value="{x:Static ppt:PptCheckLevel.Error}">
+                      <Setter Property="Foreground" Value="{StaticResource DangerTextBrush}" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
+            <ItemsControl ItemsSource="{Binding PptCheckLines}" Margin="0,8,0,0">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="12" Margin="0,2"
+                             Foreground="{StaticResource MutedBrush}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
 
         <TextBlock Text="Dissolvenza" FontSize="15" FontWeight="SemiBold" Margin="0,22,0,6" />
         <DockPanel>

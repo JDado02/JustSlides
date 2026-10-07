@@ -12,6 +12,7 @@ Guida rapida per l'operatore. Per i dettagli tecnici: `CLAUDE.md` (specifica) e 
 - [ ] Almeno 10 GB liberi su `C:` (copie locali dei file + log).
 - [ ] **PowerPoint chiuso** (vedi "Regole d'oro"). Chiudi anche Teams/Zoom/OneDrive che possono aprire finestre.
 - [ ] Salvaschermo e blocco schermo disattivati.
+- [ ] **PowerPoint verificato**: Impostazioni → PowerPoint → "Verifica licenza PowerPoint" (a Tappo, con PowerPoint chiuso). Verde = pronto; **ambra** = funziona ma Office non risulta attivato (può comparire una richiesta di accesso che blocca la regia in onda: attivalo prima); **rosso** = non usare le PPT in questo stato (esporta in PDF/video). La verifica è solo su richiesta, la regia non la fa da sola all'avvio. Non prova lo slideshow a schermo intero né i file veri.
 
 **Collegamenti**
 - [ ] Proiettore / matrice / scaler acceso e collegato **prima** di avviare la regia, sorgente giusta.

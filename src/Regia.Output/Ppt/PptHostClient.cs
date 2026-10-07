@@ -165,6 +165,68 @@ public sealed class PptHostClient : IDisposable
     /// <summary>PptHost in esecuzione e PowerPoint avviato (se serve li riavvia). Lancia <see cref="PptException"/>.</summary>
     public async Task EnsureReadyAsync(CancellationToken cancellationToken = default)
     {
+        await EnsureHostRunningAsync(cancellationToken);
+
+        // Idempotente: se PowerPoint è vivo risponde subito, se è morto lo riavvia.
+        var response = await SendAsync(PptCommands.Launch, null, OpenTimeout(), cancellationToken);
+        if (PptProtocol.ReadData<LaunchResult>(response) is { PowerPointPid: > 0 } launch)
+            RegisterPowerPoint(launch.PowerPointPid);
+    }
+
+    /// <summary>
+    /// "Verifica PowerPoint": prova tecnica dentro PptHost (avvio, creazione, salvataggio e riapertura di una presentazione di prova).
+    /// Se resta bloccata da un dialogo di PowerPoint il risultato lo dice e qui si termina PowerPoint (il nostro), come per un guasto.
+    /// Lancia <see cref="PptException"/> (istanza dell'utente, timeout, host caduto).
+    /// </summary>
+    public async Task<PptSelfTestResult> SelfTestAsync(CancellationToken cancellationToken = default)
+    {
+        await EnsureHostRunningAsync(cancellationToken);
+
+        var timeout = TimeSpan.FromMilliseconds(Settings.PptOpenTimeoutMs) + SelfTestExtra + RequestSlack;
+        var response = await SendAsync(PptCommands.SelfTest, null, timeout, cancellationToken);
+
+        // PowerPoint, una volta avviato, resta pronto per le presentazioni (come dopo un pre-avvio).
+        var pid = PowerPointPidFromHost();
+        if (pid > 0)
+            RegisterPowerPoint(pid);
+
+        var result = PptProtocol.ReadData<PptSelfTestResult>(response)
+                     ?? throw new PptException(PptErrors.Generic, "Risposta della verifica non valida");
+
+        if (result.FailedStep == PptSelfTestSteps.Dialog)
+        {
+            // Il thread STA di PptHost è fermo sul dialogo: nessun'altra via che terminare ciò che è nostro.
+            int generation;
+            lock (_gate)
+                generation = _generation;
+
+            await Task.Run(() => HandleFailure(generation, "verifica: PowerPoint è bloccato da una finestra di dialogo"));
+        }
+
+        return result;
+    }
+
+    /// <summary>Tempo in più, oltre al timeout di apertura, per la prova tecnica (avvio a freddo + salvataggio + riapertura).</summary>
+    private static readonly TimeSpan SelfTestExtra = TimeSpan.FromSeconds(15);
+
+    /// <summary>PID del POWERPNT unico presente (il nostro: prima della prova non ce ne sono altri), 0 se non c'è.</summary>
+    private static int PowerPointPidFromHost()
+    {
+        var processes = Process.GetProcessesByName("POWERPNT");
+        try
+        {
+            return processes.Length == 1 ? processes[0].Id : 0;
+        }
+        finally
+        {
+            foreach (var process in processes)
+                process.Dispose();
+        }
+    }
+
+    /// <summary>PptHost in esecuzione (se serve lo avvia); rifiuta se c'è un PowerPoint dell'utente. Non avvia PowerPoint.</summary>
+    private async Task EnsureHostRunningAsync(CancellationToken cancellationToken)
+    {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         // Un guasto è ancora in chiusura (kill in corso): si aspetta, poi si riparte da zero.
@@ -191,11 +253,6 @@ public sealed class PptHostClient : IDisposable
         }
 
         await start.WaitAsync(cancellationToken);
-
-        // Idempotente: se PowerPoint è vivo risponde subito, se è morto lo riavvia.
-        var response = await SendAsync(PptCommands.Launch, null, OpenTimeout(), cancellationToken);
-        if (PptProtocol.ReadData<LaunchResult>(response) is { PowerPointPid: > 0 } launch)
-            RegisterPowerPoint(launch.PowerPointPid);
     }
 
     /// <summary>Invia un comando e attende la risposta. Lancia <see cref="PptException"/> (errore di PowerPoint, timeout, host caduto).</summary>
@@ -367,6 +424,7 @@ public sealed class PptHostClient : IDisposable
     private TimeSpan OperationTimeout(string operation) => operation switch
     {
         PptCommands.Launch or PptCommands.Open => TimeSpan.FromMilliseconds(Settings.PptOpenTimeoutMs),
+        PptCommands.SelfTest => TimeSpan.FromMilliseconds(Settings.PptOpenTimeoutMs) + SelfTestExtra,
         PptCommands.StartShow => StartShowTimeout,
         _ => ShortOperationTimeout
     };

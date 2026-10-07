@@ -64,6 +64,104 @@ internal sealed class PowerPointDriver
 
     public bool IsLaunched => _app is not null;
 
+    /// <summary>PID del POWERPNT avviato da noi (0 = non ancora). Letto anche da altri thread (rilevamento dei dialoghi).</summary>
+    public int PowerPointPid => Volatile.Read(ref _powerPointPid);
+
+    /// <summary>
+    /// Prova tecnica per "Verifica PowerPoint": avvia PowerPoint, crea una presentazione di prova, la salva in una cartella
+    /// temporanea, la chiude e la riapre in sola lettura come nelle messe in onda vere. Il file lo crea PowerPoint stesso (niente
+    /// .pptx scritti a mano). Solo a Tappo: se c'è già una presentazione aperta rifiuta. Un passo fallito non lancia: finisce nel risultato.
+    /// </summary>
+    public PptSelfTestResult SelfTest()
+    {
+        if (_presentation is not null || _showActive)
+            throw new PptHostException(PptErrors.Generic, "PowerPoint è occupato con una presentazione: la verifica si fa a Tappo.");
+
+        var clock = Stopwatch.StartNew();
+        var path = Path.Combine(Path.GetTempPath(), $"regia-verifica-{Guid.NewGuid():N}.pptx");
+        var step = PptSelfTestSteps.Launch;
+        string? version = null, build = null;
+
+        try
+        {
+            Launch();
+            version = TryGet(() => (string)_app!.Version);
+            build = TryGet(() => (string)_app!.Build);
+            TrySet(() => _app!.DisplayAlerts = 1);
+
+            step = PptSelfTestSteps.Create;
+            dynamic created = _app!.Presentations.Add(0);   // msoFalse: senza finestra di documento
+            try
+            {
+                created.Slides.Add(1, 12);                  // ppLayoutBlank
+
+                step = PptSelfTestSteps.Save;
+                created.SaveAs(path, 24);                   // ppSaveAsOpenXMLPresentation
+            }
+            finally
+            {
+                TrySet(() => created.Saved = -1);
+                TrySet(() => created.Close());
+                Release((object?)created);
+            }
+
+            step = PptSelfTestSteps.Open;
+            var opened = Open(path);                        // sola lettura, senza finestra, come in onda
+
+            Log.Information("Verifica PowerPoint: tutti i passi riusciti ({Version}, {Slides} slide, {Ms} ms)", version, opened.Slides, clock.ElapsedMilliseconds);
+            return new PptSelfTestResult(null, null, version, build, opened.Slides, null, clock.ElapsedMilliseconds);
+        }
+        catch (PptHostException ex) when (ex.Code is PptErrors.ForeignInstance or PptErrors.NotInstalled)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Verifica PowerPoint: passo \"{Step}\" fallito", step);
+            return new PptSelfTestResult(step, ex.Message, version, build, 0, null, clock.ElapsedMilliseconds);
+        }
+        finally
+        {
+            // Chiude la presentazione di prova (se riaperta) e toglie il file temporaneo.
+            EndShow();
+            TrySet(() => File.Delete(path));
+        }
+    }
+
+    /// <summary>
+    /// Da un thread qualsiasi (non dal thread STA, che potrebbe essere bloccato proprio dal dialogo): restituisce il titolo di un
+    /// dialogo di PowerPoint rimasto aperto per almeno <paramref name="persistence"/>, oppure null se si annulla prima.
+    /// </summary>
+    public async Task<string?> WatchForDialogAsync(TimeSpan persistence, CancellationToken cancellationToken)
+    {
+        DateTime? since = null;
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var title = FindDialogTitle(PowerPointPid);
+            if (title is null)
+            {
+                since = null;
+            }
+            else
+            {
+                since ??= DateTime.UtcNow;
+                if (DateTime.UtcNow - since >= persistence)
+                    return title;
+            }
+
+            try
+            {
+                await Task.Delay(250, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>Avvia PowerPoint (senza aprire file). Se ce n'è già uno dell'utente, rifiuta: non ci si aggancia a istanze non nostre.</summary>
     public int Launch()
     {
@@ -450,14 +548,51 @@ internal sealed class PowerPointDriver
     /// <summary>Un dialogo modale di PowerPoint blocca le chiamate COM: se compare lo si scrive nel log (una volta) per capirne il motivo.</summary>
     private void WarnIfDialogOpen()
     {
+        var title = FindDialogTitle(_powerPointPid);
+
+        if (title is null)
+        {
+            _dialogWarned = false;
+        }
+        else if (!_dialogWarned)
+        {
+            _dialogWarned = true;
+            Log.Warning("PowerPoint mostra un dialogo (\"{Title}\"): le chiamate COM resteranno bloccate finché non viene chiuso", title);
+        }
+    }
+
+    /// <summary>
+    /// Titolo di un dialogo (<c>#32770</c>) visibile di PowerPoint, o null se non ce ne sono. Con <paramref name="pid"/> = 0
+    /// (PowerPoint ancora in avvio) vale qualsiasi POWERPNT: durante la verifica non ne esistono altri, la regia rifiuta di partire se c'è
+    /// quello dell'utente.
+    /// </summary>
+    private static string? FindDialogTitle(int pid)
+    {
+        HashSet<uint> pids = [];
+        if (pid != 0)
+        {
+            pids.Add((uint)pid);
+        }
+        else
+        {
+            foreach (var process in Process.GetProcessesByName("POWERPNT"))
+            {
+                pids.Add((uint)process.Id);
+                process.Dispose();
+            }
+        }
+
+        if (pids.Count == 0)
+            return null;
+
         string? title = null;
         Native.EnumWindows((hwnd, _) =>
         {
             if (!Native.IsWindowVisible(hwnd))
                 return true;
 
-            Native.GetWindowThreadProcessId(hwnd, out var pid);
-            if (pid != (uint)_powerPointPid)
+            Native.GetWindowThreadProcessId(hwnd, out var owner);
+            if (!pids.Contains(owner))
                 return true;
 
             var cls = new System.Text.StringBuilder(32);
@@ -471,15 +606,7 @@ internal sealed class PowerPointDriver
             return false;
         }, IntPtr.Zero);
 
-        if (title is null)
-        {
-            _dialogWarned = false;
-        }
-        else if (!_dialogWarned)
-        {
-            _dialogWarned = true;
-            Log.Warning("PowerPoint mostra un dialogo (\"{Title}\"): le chiamate COM resteranno bloccate finché non viene chiuso", title);
-        }
+        return title;
     }
 
     private void FinishShow(bool faulted, string? reason)

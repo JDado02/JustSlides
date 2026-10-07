@@ -38,6 +38,9 @@
   <SolidColorBrush x:Key="WarnBgBrush" Color="#FF3B2A08" />
   <SolidColorBrush x:Key="WarnBorderBrush" Color="#FFB27A12" />
   <SolidColorBrush x:Key="WarnTextBrush" Color="#FFFFD79A" />
+  <SolidColorBrush x:Key="OkBgBrush" Color="#FF10301A" />
+  <SolidColorBrush x:Key="OkBorderBrush" Color="#FF2EA043" />
+  <SolidColorBrush x:Key="OkTextBrush" Color="#FFCFF5D8" />
   <SolidColorBrush x:Key="DangerBgBrush" Color="#FF4A1313" />
   <SolidColorBrush x:Key="DangerBorderBrush" Color="#FFC62828" />
   <SolidColorBrush x:Key="DangerTextBrush" Color="#FFFFD0D0" />

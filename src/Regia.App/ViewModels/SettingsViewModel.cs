@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Regia.Core.Media;
 using Regia.Core.Monitors;
+using Regia.Core.Ppt;
 using Regia.Core.Settings;
 using Regia.Output.Audio;
 
@@ -88,6 +89,80 @@ public sealed partial class SettingsViewModel : ObservableObject
         : null;
 
     public bool HasPptAudioNote => PptAudioNote is not null;
+
+    // --- Verifica PowerPoint ---------------------------------------------------------------------------------------
+
+    /// <summary>Esegue la verifica (installazione, attivazione, prova tecnica). Null = non disponibile.</summary>
+    public Func<CancellationToken, Task<PptCheckReport>>? PptCheck { get; init; }
+
+    /// <summary>La verifica avvia PowerPoint: si può fare solo con la regia a Tappo/Errore, mai con qualcosa in onda.</summary>
+    public Func<bool>? CanCheckPpt { get; init; }
+
+    private CancellationTokenSource? _pptCheckCts;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(VerifyPptCommand))]
+    [NotifyPropertyChangedFor(nameof(PptCheckButtonText))]
+    private bool _isPptChecking;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPptCheckResult))]
+    private string? _pptCheckSummary;
+
+    [ObservableProperty]
+    private PptCheckLevel _pptCheckLevel;
+
+    public ObservableCollection<string> PptCheckLines { get; } = [];
+
+    public bool HasPptCheckResult => !string.IsNullOrEmpty(PptCheckSummary);
+
+    public string PptCheckButtonText => IsPptChecking ? "Verifica in corso..." : "Verifica licenza PowerPoint";
+
+    private bool CanVerifyPpt() => !IsPptChecking && PptCheck is not null;
+
+    [RelayCommand(CanExecute = nameof(CanVerifyPpt))]
+    private async Task VerifyPptAsync()
+    {
+        if (PptCheck is not { } check)
+            return;
+
+        PptCheckLines.Clear();
+        if (CanCheckPpt is { } canCheck && !canCheck())
+        {
+            PptCheckLevel = PptCheckLevel.Warning;
+            PptCheckSummary = "La verifica avvia PowerPoint: si può fare solo con la regia a Tappo, non durante un'onda.";
+            return;
+        }
+
+        PptCheckSummary = null;
+        IsPptChecking = true;
+        var cts = _pptCheckCts = new CancellationTokenSource();
+        try
+        {
+            var report = await check(cts.Token);
+            PptCheckLevel = report.Level;
+            foreach (var line in report.Lines)
+                PptCheckLines.Add(line);
+
+            PptCheckSummary = report.Summary;
+        }
+        catch (OperationCanceledException)
+        {
+            // Finestra chiusa durante la verifica: nessun risultato da mostrare.
+        }
+        catch (Exception ex)
+        {
+            PptCheckLevel = PptCheckLevel.Error;
+            PptCheckSummary = "La verifica non è riuscita: " + ex.Message;
+        }
+        finally
+        {
+            IsPptChecking = false;
+        }
+    }
+
+    /// <summary>Alla chiusura della finestra: si smette di aspettare la verifica in corso.</summary>
+    public void CancelPptCheck() => _pptCheckCts?.Cancel();
 
     [ObservableProperty]
     private double _fadeDurationMs;

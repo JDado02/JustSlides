@@ -74,7 +74,9 @@ internal sealed class HostServer
 
             // Accodato qui, nell'ordine di arrivo; la risposta parte a lavoro finito.
             var work = _sta.InvokeAsync(() => Execute(message));
-            _ = RespondAsync(message.Id, work.Task);
+            _ = message.Name == PptCommands.SelfTest
+                ? RespondSelfTestAsync(message.Id, work.Task)
+                : RespondAsync(message.Id, work.Task);
 
             if (message.Name == PptCommands.Quit)
                 break;
@@ -103,6 +105,30 @@ internal sealed class HostServer
         }
 
         await SendAsync(response);
+    }
+
+    /// <summary>
+    /// La prova tecnica può restare ferma su un dialogo di PowerPoint (accesso, attivazione): il thread STA sarebbe bloccato e non
+    /// risponderebbe mai. Da qui, fuori dal thread STA, si controlla se un dialogo resta aperto: in tal caso si risponde subito con il
+    /// suo titolo (la regia poi termina PowerPoint).
+    /// </summary>
+    private async Task RespondSelfTestAsync(long id, Task<object?> work)
+    {
+        using var cts = new CancellationTokenSource();
+        var dialog = _driver!.WatchForDialogAsync(TimeSpan.FromSeconds(2.5), cts.Token);
+
+        var first = await Task.WhenAny(work, dialog);
+        cts.Cancel();
+
+        if (first == dialog && !work.IsCompleted && await dialog is { } title)
+        {
+            Log.Warning("Verifica PowerPoint bloccata da un dialogo (\"{Title}\")", title);
+            await SendAsync(PptProtocol.Success(id,
+                new PptSelfTestResult(PptSelfTestSteps.Dialog, null, null, null, 0, title, 0)));
+            return;
+        }
+
+        await RespondAsync(id, work);
     }
 
     /// <summary>Eseguito sul thread STA.</summary>
@@ -144,6 +170,9 @@ internal sealed class HostServer
                 case PptCommands.EndShow:
                     driver.EndShow();
                     return null;
+
+                case PptCommands.SelfTest:
+                    return driver.SelfTest();
 
                 case PptCommands.Quit:
                     driver.Quit();

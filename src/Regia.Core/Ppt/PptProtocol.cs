@@ -16,6 +16,9 @@ public static class PptCommands
     public const string GoTo = "goto";
     public const string EndShow = "end";
     public const string Quit = "quit";
+
+    /// <summary>Prova tecnica per "Verifica PowerPoint" (Impostazioni): crea, salva e riapre una presentazione di prova.</summary>
+    public const string SelfTest = "selftest";
 }
 
 /// <summary>Nomi degli eventi inviati da PptHost alla regia.</summary>
@@ -91,6 +94,31 @@ public sealed record HelloResult(int HostPid, string Version);
 public sealed record NavigateResult(bool Moved, bool AtEnd, int Slide, int Total);
 
 public sealed record LaunchResult(int PowerPointPid);
+
+/// <summary>Nomi dei passi della prova tecnica (campo <see cref="PptSelfTestResult.FailedStep"/>).</summary>
+public static class PptSelfTestSteps
+{
+    public const string Launch = "launch";
+    public const string Create = "create";
+    public const string Save = "save";
+    public const string Open = "open";
+
+    /// <summary>Un dialogo di PowerPoint ha bloccato la prova (<see cref="PptSelfTestResult.DialogTitle"/>).</summary>
+    public const string Dialog = "dialog";
+}
+
+/// <summary>
+/// Esito della prova tecnica. <c>FailedStep</c> null = tutti i passi riusciti. Con <c>FailedStep = "dialog"</c> la prova è rimasta
+/// bloccata da una finestra di PowerPoint (<c>DialogTitle</c>) e PowerPoint va terminato.
+/// </summary>
+public sealed record PptSelfTestResult(
+    string? FailedStep,
+    string? Error,
+    string? Version,
+    string? Build,
+    int Slides,
+    string? DialogTitle,
+    long ElapsedMs);
 
 /// <summary>Risposta al Ping: serve al watchdog per distinguere un thread STA bloccato da uno solo impegnato.</summary>
 public sealed record PingResult(string? BusyOperation, long BusyMs);
