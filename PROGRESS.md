@@ -6,8 +6,8 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - **M1 Base e Tappo: COMPLETATA** e testata a mano dall'utente ("funziona tutto"). Commit `3efbf4c`.
 - **M2 Macchina a stati + immagini e PDF: COMPLETATA** e testata a mano dall'utente ("funziona tutto"). Build 0 avvisi, 96 test xUnit verdi. Commit `efdfc2c`.
 - **M3 Video: COMPLETATA** e testata a mano dall'utente ("funziona tutto"). Commit `0d1fcb6`. Rifinitura successiva richiesta dall'utente (volume per video + scorrimento), vedi "Decisioni prese in M3". Build 0 avvisi, 131 test xUnit verdi. Seconda rifinitura (bug Tappo nero, volumi indipendenti, tema) il 2026-10-06, vedi sotto.
-- **M4 PptHost: IMPLEMENTATA, in attesa dei test manuali dell'utente** (monitor reale, vedi "Da verificare a mano in M4"). Build 0 avvisi, 176 test xUnit verdi. Provata da me end-to-end in simulazione con PowerPoint 16 reale (GO, frecce, fine slideshow, PANIC, kill di host/PowerPoint, regia morta, PowerPoint dell'utente aperto).
-- Prossima: **M5 Audio PowerPoint**. Non iniziare finché l'utente non conferma i test di M4 e approva il piano.
+- **M4 PptHost: COMPLETATA** e testata a mano dall'utente ("sembra funzionare tutto", dopo i fix del 2026-10-07; commit `76ab5cf`, `5cc662d`, `06e28f8`). Build 0 avvisi, 176 test xUnit verdi. Provata da me end-to-end in simulazione con PowerPoint 16 reale (GO, frecce, fine slideshow, PANIC, kill di host/PowerPoint, regia morta, PowerPoint dell'utente aperto).
+- Prossima: **M5 Audio PowerPoint**. Non iniziare finché l'utente non approva il piano.
 
 ## Ambiente
 - .NET SDK 10.0.401, PowerPoint 16 (M365, x64), git 2.53. Identità git impostata solo nel repo (Davide / chatbotdt@gmail.com).
@@ -127,4 +127,4 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - Il pulsante "10 s ▶▶" non è stato provato dal vivo (lo è "◀◀ 10 s", che usa lo stesso `SeekBy`; coperto dai test).
 
 ## Prossimo passo
-M4 è implementata e committata; **aspettare che l'utente confermi i test manuali** (sezione "Da verificare a mano in M4"). Poi leggere CLAUDE.md e questo file e **proporre il piano di M5 (Audio PowerPoint)**: sessione CoreAudio di `POWERPNT.EXE` per PID (il PID è già noto: `PptHostClient` registra `OwnedProcess` "PowerPoint"), fader/Mute, fade audio sincronizzato, avviso se il dispositivo scelto non è il predefinito di Windows. Attendere l'approvazione prima di scrivere codice.
+M4 è chiusa e confermata dall'utente. Leggere CLAUDE.md e questo file e **proporre il piano di M5 (Audio PowerPoint)**: sessione CoreAudio di `POWERPNT.EXE` per PID (il PID è già noto: `PptHostClient` registra `OwnedProcess` "PowerPoint"), fader/Mute, fade audio sincronizzato, avviso se il dispositivo scelto non è il predefinito di Windows. Attendere l'approvazione prima di scrivere codice.
