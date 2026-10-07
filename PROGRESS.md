@@ -259,4 +259,8 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - Il pulsante "10 s ▶▶" non è stato provato dal vivo (lo è "◀◀ 10 s", che usa lo stesso `SeekBy`; coperto dai test).
 
 ## Prossimo passo
-M1–M8 sono completate e confermate. M9 (UI) è implementata e aspetta la prova manuale dell'utente. Restano le prove con il secondo monitor (OPERATIVO.md §5) e le voci "non fatto / non provato" di M8 e M9.
+M1–M9 sono completate e confermate, più, fuori milestone: Verifica PowerPoint e rinomina in **JustSlides** (confermata dall'utente: "sembra funzionare tutto", 2026-10-07, commit `c11dfbc`).
+
+**Prossimo passo richiesto dall'utente: pacchetto di installazione** con nome e icona di JustSlides e collegamento sul desktop (vedi "Nome ufficiale: JustSlides": oggi non c'è nessun installer; l'icona è in `src\Regia.Output\Assets\JustSlides.ico`; la cartella dati è `%LOCALAPPDATA%\JustSlides`, con migrazione dalla vecchia `Regia`; PptHost va copiato accanto a JustSlides.exe; l'app è framework-dependent .NET 10 x64, quindi l'installer deve gestire il runtime; VLC arriva dal pacchetto NuGet `VideoLAN.LibVLC.Windows`).
+
+Restano poi: le prove con il secondo monitor (OPERATIVO.md §5), le voci "non fatto / non provato" di M8 e M9, e il glitch del primo PDF (vedi "Aperto / da chiarire").
