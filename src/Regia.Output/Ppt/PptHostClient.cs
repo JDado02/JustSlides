@@ -206,6 +206,40 @@ public sealed class PptHostClient : IDisposable
         return result;
     }
 
+    /// <summary>
+    /// Tappo PowerPoint: esporta le slide di <paramref name="path"/> in PNG dentro <paramref name="outDir"/>. Una tantum, quando
+    /// l'operatore sceglie il file: PowerPoint non viene mai usato per mostrare il Tappo. Lancia <see cref="PptException"/>.
+    /// </summary>
+    public async Task<ExportSlidesResult> ExportSlidesAsync(string path, string outDir, int maxWidth, int maxHeight, CancellationToken cancellationToken = default)
+    {
+        await EnsureHostRunningAsync(cancellationToken);
+
+        try
+        {
+            var response = await SendAsync(PptCommands.ExportSlides, new ExportSlidesArgs(path, outDir, maxWidth, maxHeight),
+                ExportTimeout + RequestSlack, cancellationToken);
+
+            var pid = PowerPointPidFromHost();
+            if (pid > 0)
+                RegisterPowerPoint(pid);
+
+            return PptProtocol.ReadData<ExportSlidesResult>(response)
+                   ?? throw new PptException(PptErrors.Generic, "Risposta dell'esportazione non valida");
+        }
+        catch (PptException ex) when (ex.Code == PptErrors.Dialog)
+        {
+            // Il thread STA di PptHost è fermo sul dialogo: come per la verifica, si termina ciò che è nostro.
+            int generation;
+            lock (_gate)
+                generation = _generation;
+
+            await Task.Run(() => HandleFailure(generation, "esportazione del Tappo: PowerPoint è bloccato da una finestra di dialogo"));
+            throw;
+        }
+    }
+
+    private TimeSpan ExportTimeout => TimeSpan.FromMilliseconds(Settings.PptOpenTimeoutMs) + TimeSpan.FromMinutes(5);
+
     /// <summary>Tempo in più, oltre al timeout di apertura, per la prova tecnica (avvio a freddo + salvataggio + riapertura).</summary>
     private static readonly TimeSpan SelfTestExtra = TimeSpan.FromSeconds(15);
 
@@ -425,6 +459,7 @@ public sealed class PptHostClient : IDisposable
     {
         PptCommands.Launch or PptCommands.Open => TimeSpan.FromMilliseconds(Settings.PptOpenTimeoutMs),
         PptCommands.SelfTest => TimeSpan.FromMilliseconds(Settings.PptOpenTimeoutMs) + SelfTestExtra,
+        PptCommands.ExportSlides => ExportTimeout,
         PptCommands.StartShow => StartShowTimeout,
         _ => ShortOperationTimeout
     };

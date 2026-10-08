@@ -34,7 +34,7 @@ File: `JustSlides-Setup-<versione>.exe` (circa 85 MB, in `artifacts\` sul PC di 
 **La regia**
 - [ ] Avvio: `JustSlides.exe`. (La prima volta dopo il passaggio dal vecchio nome "Regia" i dati si portano da soli da `%LOCALAPPDATA%\Regia` a `%LOCALAPPDATA%\JustSlides`: show, impostazioni e tasti si copiano, la cache dei file si sposta.) Se è già aperta, una seconda copia non parte (porta in primo piano la prima).
 - [ ] Impostazioni → Monitor di output: scegli il proiettore (pulsante "Identifica" per riconoscerlo); **niente banner arancione "simulazione"**.
-- [ ] Impostazioni → Tappo (immagine o video in loop), dissolvenza (default 500 ms), cartella contenuti dell'evento.
+- [ ] Impostazioni → Tappo (immagine, video in loop o **PowerPoint**), dissolvenza (default 500 ms), cartella contenuti dell'evento. **Tappo PowerPoint**: le slide diventano immagini UNA volta premendo Applica (a Tappo, PowerPoint dell'utente chiuso); poi il Tappo non usa più PowerPoint. Loop (default 6 s per slide) oppure "Fermo su una slide": nel Program compaiono ◀ ▶ (solo mouse) e la slide scelta si ricorda anche dopo un'onda e al riavvio. Se cambi il file .pptx del Tappo, premi di nuovo Applica.
 - [ ] Scaletta: tutti i file con pallino **verde** (pronti). Rosso = non mandabile; arancione = avviso (leggi il dettaglio: font mancanti, collegamenti rotti...).
 - [ ] **Prova generale**: manda in onda un PPT, un video e un PDF/immagine del vero evento; verifica audio, posizione sul proiettore, slide avanti/indietro con il clicker, **T** (Torna al Tappo) ed **Esc** (PANIC).
 - [ ] **Prova hotplug**: a Tappo, spegni il proiettore (o stacca il cavo) → banner rosso "OUTPUT SCOLLEGATO", la regia non viene coperta; riaccendi → dopo ~2 s il Tappo riappare da solo. Poi GO funziona.

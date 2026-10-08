@@ -5,7 +5,19 @@ namespace Regia.Core.Settings;
 public enum TappoKind
 {
     Image,
-    Video
+    Video,
+
+    /// <summary>Presentazione PowerPoint esportata una volta in immagini (<see cref="TappoSettings.SlidesDir"/>): a runtime PowerPoint non c'entra.</summary>
+    Slides
+}
+
+public enum TappoSlidesMode
+{
+    /// <summary>Le slide scorrono da sole e ricominciano.</summary>
+    Loop,
+
+    /// <summary>Resta ferma sulla slide scelta (<see cref="TappoSettings.SlideIndex"/>), che si cambia solo dalle frecce a schermo.</summary>
+    Hold
 }
 
 public sealed record TappoSettings
@@ -14,6 +26,33 @@ public sealed record TappoSettings
 
     /// <summary>Percorso del file immagine o video. Vuoto = Tappo nero.</summary>
     public string Path { get; init; } = "";
+
+    public const int MinSlideSeconds = 2;
+    public const int MaxSlideSeconds = 120;
+
+    /// <summary>Tappo PowerPoint: loop o fermo su una slide.</summary>
+    public TappoSlidesMode SlidesMode { get; init; } = TappoSlidesMode.Loop;
+
+    /// <summary>Tappo PowerPoint in loop: secondi per slide.</summary>
+    public int SlideSeconds { get; init; } = 6;
+
+    /// <summary>Tappo PowerPoint fermo: slide mostrata (1-based). Si ricorda anche dopo un'onda e al riavvio.</summary>
+    public int SlideIndex { get; init; } = 1;
+
+    /// <summary>Cartella con le immagini esportate (<c>slide-001.png</c>...). Vuota = non ancora esportate.</summary>
+    public string SlidesDir { get; init; } = "";
+
+    /// <summary>Numero di slide esportate.</summary>
+    public int SlideCount { get; init; }
+
+    public TappoSettings Normalized() => this with
+    {
+        Path = Path ?? "",
+        SlidesDir = SlidesDir ?? "",
+        SlideSeconds = Math.Clamp(SlideSeconds, MinSlideSeconds, MaxSlideSeconds),
+        SlideCount = Math.Max(SlideCount, 0),
+        SlideIndex = Math.Clamp(SlideIndex, 1, Math.Max(SlideCount, 1))
+    };
 }
 
 /// <summary>Impostazioni dell'evento (monitor, Tappo, dissolvenza).</summary>
@@ -55,7 +94,7 @@ public sealed record AppSettings
         FadeDurationMs = Math.Clamp(FadeDurationMs, MinFadeMs, MaxFadeMs),
         PptHostTimeoutMs = Math.Max(PptHostTimeoutMs, 500),
         PptOpenTimeoutMs = Math.Max(PptOpenTimeoutMs, 5000),
-        Tappo = Tappo ?? new TappoSettings(),
+        Tappo = (Tappo ?? new TappoSettings()).Normalized(),
         SourceFolder = SourceFolder?.Trim() ?? ""
     };
 }

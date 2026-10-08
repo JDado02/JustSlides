@@ -469,6 +469,35 @@
               </Button>
             </Grid>
 
+            <!-- Tappo PowerPoint fermo: frecce a schermo (solo mouse), nella stessa riga delle frecce pagina (mai insieme: a Tappo non c'è pagina) -->
+            <Grid Grid.Row="2" Margin="0,4,0,0">
+              <Grid.Style>
+                <Style TargetType="Grid">
+                  <Setter Property="Visibility" Value="Hidden" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding HasTappoNav}" Value="True">
+                      <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Grid.Style>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="56" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="56" />
+              </Grid.ColumnDefinitions>
+              <Button Grid.Column="0" Command="{Binding TappoPreviousSlideCommand}" Padding="0,2" Focusable="False"
+                      AutomationProperties.Name="Slide precedente del Tappo" ToolTip="Slide precedente del Tappo (solo mouse)">
+                <TextBlock Text="&#xE76B;" Style="{StaticResource IconText}" />
+              </Button>
+              <TextBlock Grid.Column="1" Text="{Binding TappoSlideText}" FontSize="16" FontWeight="SemiBold"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+              <Button Grid.Column="2" Command="{Binding TappoNextSlideCommand}" Padding="0,2" Focusable="False"
+                      AutomationProperties.Name="Slide successiva del Tappo" ToolTip="Slide successiva del Tappo (solo mouse)">
+                <TextBlock Text="&#xE76C;" Style="{StaticResource IconText}" />
+              </Button>
+            </Grid>
+
             <TextBlock Grid.Row="3" Text="{Binding Program.NextText}" FontSize="13" Margin="0,4,0,0"
                        TextTrimming="CharacterEllipsis" Foreground="{StaticResource MutedBrush}" />
           </Grid>

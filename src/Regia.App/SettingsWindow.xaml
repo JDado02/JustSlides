@@ -64,11 +64,41 @@
         <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
           <RadioButton Content="Immagine" IsChecked="{Binding IsImageTappo}" GroupName="TappoKind" />
           <RadioButton Content="Video in loop" IsChecked="{Binding IsVideoTappo}" GroupName="TappoKind" />
+          <RadioButton Content="PowerPoint (solo immagini)" IsChecked="{Binding IsSlidesTappo}" GroupName="TappoKind" Margin="0" />
         </StackPanel>
         <DockPanel>
           <Button DockPanel.Dock="Right" Content="Sfoglia..." Margin="8,0,0,0" Command="{Binding BrowseTappoCommand}" />
           <TextBox Text="{Binding TappoPath, UpdateSourceTrigger=PropertyChanged}" />
         </DockPanel>
+
+        <!-- Tappo PowerPoint: visibile solo con quella scelta -->
+        <StackPanel Margin="0,10,0,0">
+          <StackPanel.Style>
+            <Style TargetType="StackPanel">
+              <Setter Property="Visibility" Value="Collapsed" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSlidesTappo}" Value="True">
+                  <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </StackPanel.Style>
+          <StackPanel Orientation="Horizontal">
+            <RadioButton Content="Loop" IsChecked="{Binding SlidesLoop}" GroupName="TappoSlidesMode" />
+            <RadioButton Content="Fermo su una slide" IsChecked="{Binding SlidesHold}" GroupName="TappoSlidesMode" Margin="0"
+                         ToolTip="Resta sulla slide scelta con le frecce a schermo nella regia; se la ricorda anche dopo un'onda" />
+          </StackPanel>
+          <DockPanel Margin="0,8,0,0">
+            <TextBlock DockPanel.Dock="Left" Text="Secondi per slide (loop)" Foreground="{StaticResource MutedBrush}"
+                       VerticalAlignment="Center" Margin="0,0,12,0" />
+            <TextBlock DockPanel.Dock="Right" Width="50" TextAlignment="Right" VerticalAlignment="Center"
+                       Text="{Binding SlideSeconds, StringFormat={}{0:0} s}" />
+            <Slider Minimum="{Binding MinSlideSeconds}" Maximum="{Binding MaxSlideSeconds}" Value="{Binding SlideSeconds}"
+                    TickFrequency="1" IsSnapToTickEnabled="True" SmallChange="1" LargeChange="5" VerticalAlignment="Center" />
+          </DockPanel>
+          <TextBlock Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,0"
+                     Text="Le slide vengono trasformate in immagini UNA volta, premendo Applica (con la regia a Tappo e senza PowerPoint aperto). Poi il Tappo usa solo le immagini: PowerPoint non c'entra più, nemmeno con PANIC o se si pianta. Animazioni, video e tempi delle slide non si vedono; le slide nascoste si saltano." />
+        </StackPanel>
 
         <TextBlock Text="Uscita audio" FontSize="15" FontWeight="SemiBold" Margin="0,22,0,6" />
         <ListBox ItemsSource="{Binding AudioDevices}" SelectedItem="{Binding SelectedAudioDevice}"

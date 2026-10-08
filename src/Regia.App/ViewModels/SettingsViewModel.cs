@@ -8,6 +8,7 @@ using Regia.Core.Monitors;
 using Regia.Core.Ppt;
 using Regia.Core.Settings;
 using Regia.Output.Audio;
+using Regia.Output.Ppt;
 
 namespace Regia.App.ViewModels;
 
@@ -66,8 +67,24 @@ public sealed partial class SettingsViewModel : ObservableObject
     public bool HasSimulationFallbackNote => SimulationFallbackNote is not null;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsImageTappo))]
     [NotifyPropertyChangedFor(nameof(IsVideoTappo))]
-    private bool _isImageTappo;
+    [NotifyPropertyChangedFor(nameof(IsSlidesTappo))]
+    private TappoKind _tappoKind;
+
+    /// <summary>Tappo PowerPoint: true = fermo su una slide, false = loop.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SlidesLoop))]
+    private bool _slidesHold;
+
+    [ObservableProperty]
+    private double _slideSeconds = 6;
+
+    /// <summary>
+    /// Esporta il PPT del Tappo in immagini (una volta). Lancia se non si può (qualcosa in onda, PowerPoint dell'utente aperto, errore).
+    /// Null = non disponibile.
+    /// </summary>
+    public Func<string, CancellationToken, Task<TappoSlidesInfo>>? ExportTappoSlides { get; init; }
 
     [ObservableProperty]
     private string _tappoPath = "";
@@ -203,7 +220,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         SelectedAudioDevice = AudioDevices.FirstOrDefault(a => a.Id == current.AudioDeviceId) ?? AudioDevices[0];
 
         SimulationMode = current.SimulationMode;
-        IsImageTappo = current.Tappo.Kind == TappoKind.Image;
+        TappoKind = current.Tappo.Kind;
+        SlidesHold = current.Tappo.SlidesMode == TappoSlidesMode.Hold;
+        SlideSeconds = Math.Min(current.Tappo.SlideSeconds, MaxSlideSeconds);
         TappoPath = current.Tappo.Path;
         SourceFolder = current.SourceFolder;
         FadeDurationMs = current.FadeDurationMs;
@@ -214,11 +233,34 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public ObservableCollection<AudioDeviceItem> AudioDevices { get; } = [];
 
+    // Tre scelte esclusive (RadioButton): si agisce solo quando una diventa vera.
+    public bool IsImageTappo
+    {
+        get => TappoKind == TappoKind.Image;
+        set { if (value) TappoKind = TappoKind.Image; }
+    }
+
     public bool IsVideoTappo
     {
-        get => !IsImageTappo;
-        set => IsImageTappo = !value;
+        get => TappoKind == TappoKind.Video;
+        set { if (value) TappoKind = TappoKind.Video; }
     }
+
+    public bool IsSlidesTappo
+    {
+        get => TappoKind == TappoKind.Slides;
+        set { if (value) TappoKind = TappoKind.Slides; }
+    }
+
+    public bool SlidesLoop
+    {
+        get => !SlidesHold;
+        set => SlidesHold = !value;
+    }
+
+    public double MinSlideSeconds => TappoSettings.MinSlideSeconds;
+
+    public double MaxSlideSeconds => 60;
 
     public double MinFade => AppSettings.MinFadeMs;
 
@@ -232,11 +274,12 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         var dialog = new OpenFileDialog
         {
-            Title = "Scegli il file del Tappo (immagine o video)",
-            // Sempre immagini e video insieme: il tipo del Tappo si imposta da solo dal file scelto.
-            Filter = "Immagini e video|*.jpg;*.jpeg;*.png;*.bmp;*.mp4;*.mov;*.mkv;*.avi;*.wmv;*.m4v" +
+            Title = "Scegli il file del Tappo (immagine, video o PowerPoint)",
+            // Sempre tutto insieme: il tipo del Tappo si imposta da solo dal file scelto.
+            Filter = "Immagini, video e PowerPoint|*.jpg;*.jpeg;*.png;*.bmp;*.mp4;*.mov;*.mkv;*.avi;*.wmv;*.m4v;*.pptx;*.ppsx;*.ppt;*.pps" +
                      "|Immagini|*.jpg;*.jpeg;*.png;*.bmp" +
                      "|Video|*.mp4;*.mov;*.mkv;*.avi;*.wmv;*.m4v" +
+                     "|PowerPoint|*.pptx;*.ppsx;*.ppt;*.pps" +
                      "|Tutti i file|*.*",
             CheckFileExists = true
         };
@@ -246,8 +289,13 @@ public sealed partial class SettingsViewModel : ObservableObject
 
         TappoPath = dialog.FileName;
 
-        // Un video diventa "Video in loop", ogni altro file (immagine) "Immagine".
-        IsImageTappo = MediaKindDetector.FromPath(dialog.FileName) != MediaKind.Video;
+        // Un video diventa "Video in loop", un PowerPoint "PowerPoint (solo immagini)", ogni altro file (immagine) "Immagine".
+        TappoKind = MediaKindDetector.FromPath(dialog.FileName) switch
+        {
+            MediaKind.Video => TappoKind.Video,
+            MediaKind.Ppt => TappoKind.Slides,
+            _ => TappoKind.Image
+        };
     }
 
     [RelayCommand]
@@ -269,16 +317,47 @@ public sealed partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private async Task ApplyAsync()
     {
+        var tappoPath = TappoPath?.Trim() ?? "";
+        var tappo = new TappoSettings
+        {
+            Kind = TappoKind,
+            Path = tappoPath,
+            SlidesMode = SlidesHold ? TappoSlidesMode.Hold : TappoSlidesMode.Loop,
+            SlideSeconds = (int)Math.Round(SlideSeconds),
+            // Stesso file di prima: si ricorda la slide su cui era fermo e le immagini già esportate.
+            SlideIndex = string.Equals(tappoPath, _current.Tappo.Path, StringComparison.OrdinalIgnoreCase) ? _current.Tappo.SlideIndex : 1,
+            SlidesDir = _current.Tappo.SlidesDir,
+            SlideCount = _current.Tappo.SlideCount
+        };
+
+        if (TappoKind == TappoKind.Slides)
+        {
+            if (tappoPath.Length == 0 || ExportTappoSlides is null)
+            {
+                Status = "Tappo PowerPoint: scegli prima il file.";
+                return;
+            }
+
+            Status = "Preparo le slide del Tappo con PowerPoint (una volta sola, può richiedere qualche decina di secondi)...";
+            try
+            {
+                var info = await ExportTappoSlides(tappoPath, CancellationToken.None);
+                tappo = tappo with { SlidesDir = info.Dir, SlideCount = info.Count };
+            }
+            catch (Exception ex)
+            {
+                // Niente viene applicato: il Tappo di prima resta com'è.
+                Status = "Tappo PowerPoint non applicato: " + ex.Message;
+                return;
+            }
+        }
+
         var settings = _current with
         {
             // Se il monitor salvato non è collegato ora lo conservo, così non lo perdo.
             OutputMonitor = SelectedMonitor?.Info.ToId() ?? _current.OutputMonitor,
             SimulationMode = SimulationMode,
-            Tappo = new TappoSettings
-            {
-                Kind = IsImageTappo ? TappoKind.Image : TappoKind.Video,
-                Path = TappoPath?.Trim() ?? ""
-            },
+            Tappo = tappo,
             SourceFolder = SourceFolder?.Trim() ?? "",
             AudioDeviceId = SelectedAudioDevice?.Id ?? "",
             AudioDeviceName = SelectedAudioDevice?.Name ?? "",

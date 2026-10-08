@@ -74,9 +74,12 @@ internal sealed class HostServer
 
             // Accodato qui, nell'ordine di arrivo; la risposta parte a lavoro finito.
             var work = _sta.InvokeAsync(() => Execute(message));
-            _ = message.Name == PptCommands.SelfTest
-                ? RespondSelfTestAsync(message.Id, work.Task)
-                : RespondAsync(message.Id, work.Task);
+            _ = message.Name switch
+            {
+                PptCommands.SelfTest => RespondSelfTestAsync(message.Id, work.Task),
+                PptCommands.ExportSlides => RespondExportAsync(message.Id, work.Task),
+                _ => RespondAsync(message.Id, work.Task)
+            };
 
             if (message.Name == PptCommands.Quit)
                 break;
@@ -131,6 +134,28 @@ internal sealed class HostServer
         await RespondAsync(id, work);
     }
 
+    /// <summary>
+    /// Come la prova tecnica: un dialogo di PowerPoint (file con password, avviso) bloccherebbe il thread STA. Se resta aperto si
+    /// risponde subito con un errore e la regia termina PowerPoint (il nostro).
+    /// </summary>
+    private async Task RespondExportAsync(long id, Task<object?> work)
+    {
+        using var cts = new CancellationTokenSource();
+        var dialog = _driver!.WatchForDialogAsync(TimeSpan.FromSeconds(2.5), cts.Token);
+
+        var first = await Task.WhenAny(work, dialog);
+        cts.Cancel();
+
+        if (first == dialog && !work.IsCompleted && await dialog is { } title)
+        {
+            Log.Warning("Esportazione del Tappo bloccata da un dialogo (\"{Title}\")", title);
+            await SendAsync(PptProtocol.Failure(id, PptErrors.Dialog, $"PowerPoint mostra una finestra (\"{title}\"): il file potrebbe avere una password."));
+            return;
+        }
+
+        await RespondAsync(id, work);
+    }
+
     /// <summary>Eseguito sul thread STA.</summary>
     private object? Execute(PptMessage message)
     {
@@ -173,6 +198,11 @@ internal sealed class HostServer
 
                 case PptCommands.SelfTest:
                     return driver.SelfTest();
+
+                case PptCommands.ExportSlides:
+                    var export = PptProtocol.ReadData<ExportSlidesArgs>(message)
+                                 ?? throw new PptHostException(PptErrors.Generic, "Esportazione senza argomenti");
+                    return driver.ExportSlides(export);
 
                 case PptCommands.Quit:
                     driver.Quit();

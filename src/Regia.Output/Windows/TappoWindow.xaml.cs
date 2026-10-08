@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using Regia.Output.Interop;
 using Windows.Win32.UI.WindowsAndMessaging;
 
@@ -25,7 +26,54 @@ public partial class TappoWindow : Window
     public ImageSource? Frame
     {
         get => View.Source;
-        set => View.Source = value;
+        set
+        {
+            CancelCrossfade();
+            View.Source = value;
+        }
+    }
+
+    private TaskCompletionSource? _crossfade;
+
+    /// <summary>
+    /// Passa a <paramref name="next"/> con una breve dissolvenza incrociata dentro il Tappo (slide del Tappo PowerPoint).
+    /// Completa a fine animazione o se interrotta da <see cref="Frame"/> / <see cref="CancelCrossfade"/>.
+    /// </summary>
+    public Task CrossfadeToAsync(ImageSource next, TimeSpan duration)
+    {
+        CancelCrossfade();
+
+        var done = _crossfade = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Incoming.Source = next;
+
+        var animation = new DoubleAnimation(0, 1, duration) { EasingFunction = new SineEase() };
+        animation.Completed += (_, _) =>
+        {
+            if (!ReferenceEquals(_crossfade, done))
+                return;
+
+            // Fine: l'immagine in arrivo diventa quella base e quella sopra si spegne.
+            View.Source = next;
+            Incoming.BeginAnimation(OpacityProperty, null);
+            Incoming.Opacity = 0;
+            Incoming.Source = null;
+            _crossfade = null;
+            done.TrySetResult();
+        };
+
+        Incoming.BeginAnimation(OpacityProperty, animation);
+        return done.Task;
+    }
+
+    /// <summary>Interrompe un crossfade in corso lasciando l'immagine base com'è.</summary>
+    public void CancelCrossfade()
+    {
+        var pending = _crossfade;
+        _crossfade = null;
+        Incoming.BeginAnimation(OpacityProperty, null);
+        Incoming.Opacity = 0;
+        Incoming.Source = null;
+        pending?.TrySetResult();
     }
 
     public bool ClickThrough

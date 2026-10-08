@@ -19,6 +19,9 @@ public static class PptCommands
 
     /// <summary>Prova tecnica per "Verifica PowerPoint" (Impostazioni): crea, salva e riapre una presentazione di prova.</summary>
     public const string SelfTest = "selftest";
+
+    /// <summary>Esporta le slide di una presentazione in PNG (Tappo PowerPoint). Una tantum, mai con qualcosa in onda.</summary>
+    public const string ExportSlides = "exportslides";
 }
 
 /// <summary>Nomi degli eventi inviati da PptHost alla regia.</summary>
@@ -38,6 +41,9 @@ public static class PptErrors
     public const string NoShow = "no-show";
     public const string FileNotFound = "file-not-found";
     public const string NotInstalled = "not-installed";
+
+    /// <summary>Un dialogo di PowerPoint blocca l'automazione: la regia termina PowerPoint (il nostro).</summary>
+    public const string Dialog = "dialog";
 
     /// <summary>Qualsiasi altro errore: il messaggio descrive il dettaglio.</summary>
     public const string Generic = "error";
@@ -74,6 +80,12 @@ public sealed record PptMessage
 }
 
 public sealed record OpenArgs(string Path);
+
+/// <summary>Esporta le slide visibili in <c>OutDir\slide-001.png...</c> entro il rettangolo <c>MaxWidth</c>×<c>MaxHeight</c> (proporzioni della slide).</summary>
+public sealed record ExportSlidesArgs(string Path, string OutDir, int MaxWidth, int MaxHeight);
+
+/// <summary><c>Exported</c> = immagini scritte (le slide nascoste si saltano); <c>Total</c> = slide del file.</summary>
+public sealed record ExportSlidesResult(int Exported, int Total, int Width, int Height);
 
 public sealed record OpenResult(int Slides, double SlideWidth, double SlideHeight);
 

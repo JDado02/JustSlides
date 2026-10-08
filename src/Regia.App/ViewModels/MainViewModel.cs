@@ -41,6 +41,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StateText))]
+    [NotifyPropertyChangedFor(nameof(HasTappoNav))]
     private WaveState _state = WaveState.Tappo;
 
     [ObservableProperty]
@@ -121,6 +122,7 @@ public sealed partial class MainViewModel : ObservableObject
             _show.Sync.OnWaveChanged(); // esegue gli aggiornamenti/rimozioni rimandati dal file che era in onda
         };
         _wave.PageChanged += OnPageChanged;
+        _output.TappoSlidesChanged += () => OnUi(OnTappoSlidesChanged);
         _wave.PlaybackChanged += OnPlaybackChanged;
         _wave.ErrorOccurred += message => Warning = message;
         _factory.Warning += message => Warning = message;
@@ -712,6 +714,62 @@ public sealed partial class MainViewModel : ObservableObject
             SelectedItem = visible[next];
     }
 
+    // --- Tappo PowerPoint (solo immagini): frecce a schermo, solo mouse ------------------------------------------------
+
+    /// <summary>Tappo PowerPoint fermo su una slide e regia a Tappo/Errore: si mostrano le frecce (Hidden: lo spazio resta).</summary>
+    public bool HasTappoNav => State is WaveState.Tappo or WaveState.Errore && _output.TappoSlides is { IsHold: true };
+
+    public string TappoSlideText => _output.TappoSlides is { IsHold: true } slides ? $"Tappo: slide {slides.Index} / {slides.Count}" : "";
+
+    [RelayCommand]
+    private Task TappoPreviousSlideAsync() => StepTappoAsync(-1);
+
+    [RelayCommand]
+    private Task TappoNextSlideAsync() => StepTappoAsync(1);
+
+    private async Task StepTappoAsync(int delta)
+    {
+        if (!HasTappoNav || _output.TappoSlides is not { } slides)
+            return;
+
+        try
+        {
+            await slides.StepAsync(delta);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Cambio slide del Tappo non riuscito");
+        }
+    }
+
+    private void OnTappoSlidesChanged()
+    {
+        OnPropertyChanged(nameof(HasTappoNav));
+        OnPropertyChanged(nameof(TappoSlideText));
+
+        // La slide su cui si è fermato il Tappo si ricorda (anche dopo un'onda e al riavvio) finché non la cambia l'operatore.
+        if (_output.TappoSlides is not { IsHold: true } slides || Settings.Tappo.SlideIndex == slides.Index)
+            return;
+
+        Settings = Settings with { Tappo = Settings.Tappo with { SlideIndex = slides.Index } };
+        _transitions.Settings = Settings;
+        _factory.Settings = Settings;
+        _ppt.Settings = Settings;
+        _show.UpdateSettings(Settings);
+    }
+
+    private async Task<TappoSlidesInfo> ExportTappoSlidesAsync(string path, CancellationToken cancellationToken)
+    {
+        if (TappoSlidesExporter.FindCached(path, _show.CacheRoot) is { } cached)
+            return cached;
+
+        if (State is not (WaveState.Tappo or WaveState.Errore))
+            throw new InvalidOperationException("riporta prima la regia al Tappo: PowerPoint si usa solo ora, mai con qualcosa in onda.");
+
+        var size = _output.OutputPixelSize;
+        return await TappoSlidesExporter.ExportAsync(_ppt, path, _show.CacheRoot, size.Width, size.Height, cancellationToken);
+    }
+
     private void OnPageChanged()
     {
         OnPropertyChanged(nameof(PageText));
@@ -744,7 +802,8 @@ public sealed partial class MainViewModel : ObservableObject
         {
             Keys = new KeyBindingsViewModel(_keys),
             PptCheck = ct => PowerPointCheck.RunAsync(_ppt, ct),
-            CanCheckPpt = () => State is WaveState.Tappo or WaveState.Errore
+            CanCheckPpt = () => State is WaveState.Tappo or WaveState.Errore,
+            ExportTappoSlides = ExportTappoSlidesAsync
         };
     }
 
@@ -773,5 +832,6 @@ public sealed partial class MainViewModel : ObservableObject
     {
         await _output.ApplyAsync(Settings, DisplayEnumerator.GetMonitors());
         Warning = _output.Warning;
+        OnTappoSlidesChanged();
     }
 }

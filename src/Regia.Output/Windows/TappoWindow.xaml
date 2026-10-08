@@ -6,5 +6,9 @@
         WindowStyle="None" AllowsTransparency="True" ResizeMode="NoResize"
         ShowInTaskbar="False" ShowActivated="False" Focusable="False"
         Background="Black" Width="640" Height="360">
-  <Image x:Name="View" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+  <Grid>
+    <Image x:Name="View" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+    <!-- Seconda immagine, solo per il crossfade tra le slide del Tappo PowerPoint (opacità 0 = invisibile) -->
+    <Image x:Name="Incoming" Stretch="Uniform" Opacity="0" RenderOptions.BitmapScalingMode="HighQuality" />
+  </Grid>
 </Window>

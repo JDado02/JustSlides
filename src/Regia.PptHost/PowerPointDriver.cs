@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using Regia.Core.Ppt;
+using Regia.Core.Settings;
 using Serilog;
 
 namespace Regia.PptHost;
@@ -125,6 +126,61 @@ internal sealed class PowerPointDriver
             // Chiude la presentazione di prova (se riaperta) e toglie il file temporaneo.
             EndShow();
             TrySet(() => File.Delete(path));
+        }
+    }
+
+    /// <summary>
+    /// Esporta le slide visibili in PNG (Tappo PowerPoint). Una tantum, solo a Tappo: rifiuta se c'è una presentazione aperta o uno
+    /// slideshow. Le slide nascoste si saltano. Alla fine la presentazione si chiude (PowerPoint resta avviato, pronto per le prossime).
+    /// </summary>
+    public ExportSlidesResult ExportSlides(ExportSlidesArgs args)
+    {
+        if (_presentation is not null || _showActive)
+            throw new PptHostException(PptErrors.Generic, "PowerPoint è occupato con una presentazione: l'esportazione si fa a Tappo.");
+
+        var clock = Stopwatch.StartNew();
+        try
+        {
+            var opened = Open(Path.GetFullPath(args.Path));
+
+            // Proporzioni della slide dentro il rettangolo dell'output.
+            double ratio = opened.SlideWidth / Math.Max(opened.SlideHeight, 1);
+            int width = args.MaxWidth;
+            int height = (int)Math.Round(width / ratio);
+            if (height > args.MaxHeight)
+            {
+                height = args.MaxHeight;
+                width = (int)Math.Round(height * ratio);
+            }
+
+            // PowerPoint rifiuta i percorsi con barre dritte: sempre il percorso completo di Windows.
+            var outDir = Path.GetFullPath(args.OutDir);
+            Directory.CreateDirectory(outDir);
+            int exported = 0;
+            for (int i = 1; i <= opened.Slides; i++)
+            {
+                dynamic slide = _presentation!.Slides[i];
+                try
+                {
+                    if (TryGet(() => (int)slide.SlideShowTransition.Hidden) != 0)
+                        continue;
+
+                    exported++;
+                    slide.Export(Path.Combine(outDir, TappoSlidesCache.SlideFileName(exported)), "PNG", width, height);
+                }
+                finally
+                {
+                    Release((object?)slide);
+                }
+            }
+
+            Log.Information("Tappo PowerPoint: {Exported}/{Total} slide esportate in {Dir} ({W}x{H}, {Ms} ms)",
+                exported, opened.Slides, outDir, width, height, clock.ElapsedMilliseconds);
+            return new ExportSlidesResult(exported, opened.Slides, width, height);
+        }
+        finally
+        {
+            EndShow();
         }
     }
 

@@ -389,6 +389,14 @@ public sealed class OutputHost : IDisposable
         old?.Dispose();
         Tappo.Frame = null;
 
+        TappoSlides = null;
+
+        if (settings.Kind == TappoKind.Slides)
+        {
+            await LoadSlidesTappoAsync(settings, version);
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(settings.Path))
         {
             Log.Information("Nessun file Tappo configurato: Tappo nero");
@@ -427,6 +435,50 @@ public sealed class OutputHost : IDisposable
             source?.Dispose();
             Tappo.Frame = null;
         }
+    }
+
+    /// <summary>Tappo PowerPoint (solo immagini) attivo, altrimenti null. Per le frecce a schermo della regia.</summary>
+    public SlidesTappoSource? TappoSlides { get; private set; }
+
+    /// <summary>Il Tappo PowerPoint è cambiato (slide mostrata o Tappo ricaricato).</summary>
+    public event Action? TappoSlidesChanged;
+
+    private async Task LoadSlidesTappoAsync(TappoSettings settings, int version)
+    {
+        var files = TappoSlidesCache.ListSlides(settings.SlidesDir);
+        if (files.Count == 0)
+        {
+            Warning = "Slide del Tappo PowerPoint non trovate: apri le Impostazioni, scegli di nuovo il file e premi Applica.";
+            Log.Warning("Slide del Tappo PowerPoint non trovate in {Dir}", settings.SlidesDir);
+            TappoSlidesChanged?.Invoke();
+            return;
+        }
+
+        SlidesTappoSource? source = null;
+        try
+        {
+            source = new SlidesTappoSource(files, settings.SlidesMode, settings.SlideSeconds, settings.SlideIndex);
+            await source.AttachAsync(Tappo);
+
+            if (version != _tappoLoadVersion)
+            {
+                source.Dispose();
+                return;
+            }
+
+            source.IndexChanged += () => TappoSlidesChanged?.Invoke();
+            _tappoSource = source;
+            TappoSlides = source;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Impossibile caricare il Tappo PowerPoint {Dir}", settings.SlidesDir);
+            Warning = "Impossibile aprire il Tappo PowerPoint: " + ex.Message;
+            source?.Dispose();
+            Tappo.Frame = null;
+        }
+
+        TappoSlidesChanged?.Invoke();
     }
 
     public void IdentifyMonitors(IReadOnlyList<MonitorInfo> monitors)
