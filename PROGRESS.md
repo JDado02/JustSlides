@@ -288,6 +288,10 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - **Provato da me dal vivo** (PowerPoint 16 reale, harness fuori dal repo + app in simulazione con cartella dati isolata `JUSTSLIDES_DATA_DIR`): export di un PPT di 4 slide con una nascosta → 3 PNG 1920×1080 in 1,6 s, seconda richiesta da cache senza PowerPoint, nessun processo residuo; app: Fermo su slide 2 all'avvio, frecce avanti/indietro, stop alla slide 3/3, `show.json` aggiornato, **slide 3 ricordata dopo riavvio**; Loop a 2 s: la finestra Tappo cambia slide e una foto ha colto il crossfade. **Trappola trovata**: `Slide.Export` fallisce ("Non è possibile salvare ^0 in ^1") se il percorso ha barre `/`: il driver usa sempre `Path.GetFullPath`.
 - **NON provato**: monitor reale (Tappo PPT sul secondo schermo), PPT veri grandi/con password/font mancanti, comportamento della dissolvenza GO→contenuto col Tappo PPT in loop (solo il meccanismo Freeze/Resume già usato dal video), PANIC con Tappo PPT, hotplug, clicker. Build 0 avvisi, 475 test (nuovi: `TappoSlidesTests`).
 
+## Release 1.1.0 (2026-10-08)
+- Versione 1.0.0 → **1.1.0** in `Regia.App.csproj` e `Regia.PptHost.csproj` (devono coincidere). Contenuto: riga "A fine video" solo per i video, PowerPoint a ciclo continuo rispettato, Tappo PowerPoint (vedi sezioni sopra).
+- `tools\Build-Installer.ps1` → `artifacts\JustSlides-Setup-1.1.0.exe` (85 MB, SHA256 `500D6DE610BD4C918282403A9E445B154A8C312170A6417587D6E760E8D2B111`), caricato come `JustSlides-Setup.exe` sulla release GitHub **v1.1.0** (diventa la "latest": il link del README scarica questa). La release v1.0.0 resta con il vecchio installer. Il nuovo Setup **non è stato eseguito** (solo compilato); le funzioni nuove sono state provate dal vivo con l'app di sviluppo, non con l'installato. I dati dell'utente (`%LOCALAPPDATA%\JustSlides`) non cambiano formato: i vecchi `show.json` si leggono (campi del Tappo PowerPoint con valori predefiniti).
+
 ## Prossimo passo
 M1–M9 sono completate e confermate, più, fuori milestone: Verifica PowerPoint e rinomina in **JustSlides** (confermata dall'utente: "sembra funzionare tutto", 2026-10-07, commit `c11dfbc`).
 
