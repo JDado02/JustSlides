@@ -424,7 +424,7 @@ public sealed class OutputHost : IDisposable
         ITappoSource? source = null;
         try
         {
-            if (images.Count >= 2)
+            if (images.Count >= 2 && settings.ImageLoopEffective)
                 source = new SlidesTappoSource(images, TappoSlidesMode.Loop, settings.SlideSeconds, 1, "Tappo immagini");
             else
                 source = settings.Kind == TappoKind.Video

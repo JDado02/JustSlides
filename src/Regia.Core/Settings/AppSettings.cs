@@ -33,6 +33,15 @@ public sealed record TappoSettings
     /// </summary>
     public IReadOnlyList<string> ImagePaths { get; init; } = [];
 
+    /// <summary>
+    /// Tappo immagine: true = le immagini scorrono in loop, false = resta fissa la prima. Null (show della 1.2.0 o precedenti) =
+    /// loop se la lista ha due o più immagini.
+    /// </summary>
+    public bool? ImageLoop { get; init; }
+
+    /// <summary>Loop effettivo del Tappo immagine: serve almeno una seconda immagine.</summary>
+    public bool ImageLoopEffective => (ImageLoop ?? ImagePaths.Count >= 2) && ImagePaths.Count >= 2;
+
     /// <summary>Immagini del Tappo: la lista se c'è, altrimenti il solo <see cref="Path"/>.</summary>
     public IReadOnlyList<string> EffectiveImages =>
         ImagePaths is { Count: > 0 } ? ImagePaths : string.IsNullOrWhiteSpace(Path) ? [] : [Path];

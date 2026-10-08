@@ -9,7 +9,7 @@
     <Product>JustSlides</Product>
     <AssemblyTitle>JustSlides</AssemblyTitle>
     <Description>JustSlides - regia per presentazioni, video e PDF</Description>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <ApplicationIcon>..\Regia.Output\Assets\JustSlides.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <VlcWindowsX86IncludeFiles>false</VlcWindowsX86IncludeFiles>

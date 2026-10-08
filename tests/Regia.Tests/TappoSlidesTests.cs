@@ -113,6 +113,20 @@ public class TappoSlidesTests
     }
 
     [Fact]
+    public void ImageLoopEffective_FissaOLoop()
+    {
+        var due = new[] { @"C:\img1.png", @"C:\img2.png" };
+
+        // Show della 1.2.0 (nessun campo): due o più immagini = loop.
+        Assert.True(new TappoSettings { ImagePaths = due }.ImageLoopEffective);
+        // Scelta esplicita "Fissa": resta una sola, anche se la lista ne avesse di più.
+        Assert.False(new TappoSettings { ImagePaths = due, ImageLoop = false }.ImageLoopEffective);
+        // Loop con una sola immagine = fissa.
+        Assert.False(new TappoSettings { ImagePaths = [@"C:\img1.png"], ImageLoop = true }.ImageLoopEffective);
+        Assert.False(new TappoSettings().ImageLoopEffective);
+    }
+
+    [Fact]
     public void Defaults_AreLoopSixSeconds()
     {
         var tappo = new TappoSettings();

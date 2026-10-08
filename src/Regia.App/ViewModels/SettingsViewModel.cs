@@ -87,6 +87,30 @@ public sealed partial class SettingsViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasTappoNote))]
     private bool _slidesHold;
 
+    /// <summary>Tappo immagine: true = più immagini in loop, false = una sola, fissa.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsImageFixed))]
+    [NotifyPropertyChangedFor(nameof(ShowSeconds))]
+    [NotifyPropertyChangedFor(nameof(TappoNote))]
+    [NotifyPropertyChangedFor(nameof(HasTappoNote))]
+    private bool _imageLoop;
+
+    public bool IsImageFixed
+    {
+        get => !ImageLoop;
+        set => ImageLoop = !value;
+    }
+
+    // Passando a "Fissa" resta una sola immagine (la prima della lista).
+    partial void OnImageLoopChanged(bool value)
+    {
+        if (value)
+            return;
+
+        while (TappoImages.Count > 1)
+            TappoImages.RemoveAt(TappoImages.Count - 1);
+    }
+
     /// <summary>Secondi per slide/immagine, scritti a tastiera (si valida con "Applica").</summary>
     [ObservableProperty]
     private string _slideSecondsText = "6";
@@ -98,7 +122,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     private string? _selectedTappoImage;
 
     /// <summary>I secondi servono solo al loop delle slide PowerPoint o a più immagini.</summary>
-    public bool ShowSeconds => (TappoKind == TappoKind.Slides && !SlidesHold) || (TappoKind == TappoKind.Image && TappoImages.Count >= 2);
+    public bool ShowSeconds => (TappoKind == TappoKind.Slides && !SlidesHold) || (TappoKind == TappoKind.Image && ImageLoop && TappoImages.Count >= 2);
 
     public string SecondsLabel => TappoKind == TappoKind.Image ? "Secondi per immagine" : "Secondi per slide";
 
@@ -109,8 +133,10 @@ public sealed partial class SettingsViewModel : ObservableObject
             "Come Tappo resta la slide selezionata: cambia solo a mano, con le frecce sotto il Program.",
         TappoKind.Slides =>
             "La presentazione viene trasformata in immagini: video e animazioni non vengono riprodotti nel Tappo.",
-        TappoKind.Image when TappoImages.Count >= 2 =>
+        TappoKind.Image when ImageLoop && TappoImages.Count >= 2 =>
             "Le immagini scorrono in loop con una dissolvenza incrociata, nell'ordine della lista.",
+        TappoKind.Image when !ImageLoop && TappoImages.Count == 1 =>
+            "Come Tappo resta sempre questa immagine.",
         _ => null
     };
 
@@ -263,6 +289,7 @@ public sealed partial class SettingsViewModel : ObservableObject
                 TappoImages.Add(image);
         }
 
+        ImageLoop = current.Tappo.ImageLoopEffective;
         TappoKind = current.Tappo.Kind;
         SlidesHold = current.Tappo.SlidesMode == TappoSlidesMode.Hold;
         SlideSecondsText = current.Tappo.SlideSeconds.ToString();
@@ -327,6 +354,10 @@ public sealed partial class SettingsViewModel : ObservableObject
             if (!TappoImages.Contains(file, StringComparer.OrdinalIgnoreCase))
                 TappoImages.Add(file);
         }
+
+        // Aggiungere più immagini = loop.
+        if (TappoImages.Count >= 2)
+            ImageLoop = true;
 
         TappoKind = TappoKind.Image;
     }
@@ -393,9 +424,15 @@ public sealed partial class SettingsViewModel : ObservableObject
             return;
         }
 
-        // Una o più immagini: sostituiscono la lista.
+        // Una o più immagini: sostituiscono la lista. Scegliendone più di una si passa al loop; con "Fissa" conta solo la prima.
+        var chosen = dialog.FileNames.Where(f => MediaKindDetector.FromPath(f) is not (MediaKind.Video or MediaKind.Ppt)).ToList();
+        if (chosen.Count >= 2)
+            ImageLoop = true;
+        else if (!ImageLoop && chosen.Count > 1)
+            chosen = [chosen[0]];
+
         TappoImages.Clear();
-        foreach (var file in dialog.FileNames.Where(f => MediaKindDetector.FromPath(f) is not (MediaKind.Video or MediaKind.Ppt)))
+        foreach (var file in chosen)
             TappoImages.Add(file);
 
         TappoPath = TappoImages.Count > 0 ? TappoImages[0] : "";
@@ -433,13 +470,14 @@ public sealed partial class SettingsViewModel : ObservableObject
             seconds = _current.Tappo.SlideSeconds; // campo nascosto: non serve, si tiene il valore di prima
         }
 
-        var images = TappoKind == TappoKind.Image ? TappoImages.ToList() : [];
+        var images = TappoKind == TappoKind.Image ? TappoImages.Take(ImageLoop ? int.MaxValue : 1).ToList() : [];
         var tappoPath = TappoKind == TappoKind.Image ? (images.Count > 0 ? images[0] : "") : TappoPath?.Trim() ?? "";
         var tappo = new TappoSettings
         {
             Kind = TappoKind,
             Path = tappoPath,
             ImagePaths = images,
+            ImageLoop = TappoKind == TappoKind.Image ? ImageLoop : null,
             SlidesMode = SlidesHold ? TappoSlidesMode.Hold : TappoSlidesMode.Loop,
             SlideSeconds = seconds,
             // Stesso file di prima: si ricorda la slide su cui era fermo e le immagini già esportate.

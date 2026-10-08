@@ -81,7 +81,7 @@
           <TextBox Text="{Binding TappoPath, UpdateSourceTrigger=PropertyChanged}" />
         </DockPanel>
 
-        <!-- Tappo immagine: una o più immagini (con due o più scorrono in loop) -->
+        <!-- Tappo immagine: Fissa (una sola) oppure Loop (più immagini) -->
         <StackPanel Margin="0,8,0,0">
           <StackPanel.Style>
             <Style TargetType="StackPanel">
@@ -93,14 +93,22 @@
               </Style.Triggers>
             </Style>
           </StackPanel.Style>
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+            <RadioButton Content="Fissa" IsChecked="{Binding IsImageFixed}" GroupName="TappoImageMode"
+                         ToolTip="Una sola immagine, sempre quella" />
+            <RadioButton Content="Loop" IsChecked="{Binding ImageLoop}" GroupName="TappoImageMode" Margin="0"
+                         ToolTip="Più immagini che scorrono una dopo l'altra" />
+          </StackPanel>
           <DockPanel>
             <StackPanel DockPanel.Dock="Right" Margin="8,0,0,0">
               <Button Content="Sfoglia..." Command="{Binding BrowseTappoCommand}" Padding="10,4"
-                      ToolTip="Sostituisce la lista; qui puoi scegliere anche un video o una presentazione PowerPoint" />
-              <Button Content="Aggiungi..." Command="{Binding AddTappoImagesCommand}" Padding="10,4" Margin="0,6,0,0" />
-              <Button Content="&#9650; Su" Command="{Binding MoveTappoImageUpCommand}" Padding="10,4" Margin="0,6,0,0" />
-              <Button Content="&#9660; Giù" Command="{Binding MoveTappoImageDownCommand}" Padding="10,4" Margin="0,6,0,0" />
-              <Button Content="Togli" Command="{Binding RemoveTappoImageCommand}" Padding="10,4" Margin="0,6,0,0" />
+                      ToolTip="Sostituisce la scelta; qui puoi scegliere anche un video o una presentazione PowerPoint" />
+              <StackPanel Visibility="{Binding ImageLoop, Converter={StaticResource BoolToVis}}">
+                <Button Content="Aggiungi..." Command="{Binding AddTappoImagesCommand}" Padding="10,4" Margin="0,6,0,0" />
+                <Button Content="&#9650; Su" Command="{Binding MoveTappoImageUpCommand}" Padding="10,4" Margin="0,6,0,0" />
+                <Button Content="&#9660; Giù" Command="{Binding MoveTappoImageDownCommand}" Padding="10,4" Margin="0,6,0,0" />
+                <Button Content="Togli" Command="{Binding RemoveTappoImageCommand}" Padding="10,4" Margin="0,6,0,0" />
+              </StackPanel>
             </StackPanel>
             <ListBox ItemsSource="{Binding TappoImages}" SelectedItem="{Binding SelectedTappoImage}"
                      MinHeight="70" MaxHeight="160" ScrollViewer.HorizontalScrollBarVisibility="Disabled"

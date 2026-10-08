@@ -385,7 +385,7 @@
               </ScrollViewer>
 
               <ListBox ItemsSource="{Binding Pages}" SelectedItem="{Binding SelectedPage, Mode=TwoWay}"
-                       BorderThickness="0" Background="Transparent"
+                       BorderThickness="0" Background="Transparent" VerticalAlignment="Top"
                        ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Auto">
                 <ListBox.Style>
                   <Style TargetType="ListBox" BasedOn="{StaticResource {x:Type ListBox}}">
@@ -405,6 +405,7 @@
                 <ListBox.ItemContainerStyle>
                   <Style TargetType="ListBoxItem">
                     <Setter Property="Margin" Value="0,0,4,6" />
+                    <Setter Property="VerticalAlignment" Value="Top" />
                     <Setter Property="Cursor" Value="Hand" />
                     <Setter Property="Template">
                       <Setter.Value>

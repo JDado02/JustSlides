@@ -13,6 +13,8 @@ Software di regia congressuale per Windows 11 e Windows 10 22H2 (x64): carichi P
 
 Dalla versione 1.1.1 gli aggiornamenti sono **automatici su richiesta**: Impostazioni → Aggiornamenti → *Verifica aggiornamenti* scarica e installa la versione nuova e riapre JustSlides da solo (non serve più scaricare nulla a mano da qui).
 
+Novità della versione 1.2.1: il **Tappo immagine** ha la scelta **Fissa** (una sola immagine, sempre quella) o **Loop** (più immagini che scorrono); la striscia delle pagine del PDF in Preview non si allunga più verso il basso.
+
 Novità della versione 1.2.0: un **PDF che arriva all'ultima pagina e va "avanti" ancora torna da solo al Tappo** (come PowerPoint e video); nella Preview dei PDF le pagine si scelgono con un clic e appaiono grandi; il **Tappo immagine può avere più immagini in loop** (secondi per immagine a scelta); i secondi del Tappo si scrivono con la tastiera; Impostazioni più grandi e più essenziali; la verifica PowerPoint non legge più la licenza (solo prova tecnica); la barra video e il volume compaiono solo quando servono.
 
 Novità della versione 1.1.0: il **Tappo può essere una presentazione PowerPoint** (esportata una volta in immagini: in loop oppure ferma su una slide scelta con le frecce a schermo, ricordata anche dopo un'onda); le presentazioni con "ripeti fino a Esc" ricominciano dalla prima slide; la riga "A fine video" compare solo con un video selezionato.
