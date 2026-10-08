@@ -801,6 +801,7 @@ public sealed partial class MainViewModel : ObservableObject
             () => _output.IdentifyMonitors(DisplayEnumerator.GetMonitors()))
         {
             Keys = new KeyBindingsViewModel(_keys),
+            Updates = new UpdateViewModel(new UpdateService(), () => State is WaveState.Tappo or WaveState.Errore),
             PptCheck = ct => PowerPointCheck.RunAsync(_ppt, ct),
             CanCheckPpt = () => State is WaveState.Tappo or WaveState.Errore,
             ExportTappoSlides = ExportTappoSlidesAsync

@@ -42,6 +42,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly Action _identify;
     private readonly AppSettings _current;
 
+    /// <summary>Sezione "Aggiornamenti": solo su richiesta, agisce subito (non passa da "Applica").</summary>
+    public UpdateViewModel? Updates { get; init; }
+
     /// <summary>Editor dei tasti: globali dell'app, si salvano subito (non passano da "Applica").</summary>
     public KeyBindingsViewModel? Keys { get; init; }
 

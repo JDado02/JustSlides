@@ -179,6 +179,7 @@ comandi non validi vengono ignorati e loggati. Testare la macchina a stati con x
 - Logging con Serilog su file a rotazione giornaliera: ogni messa in onda, ogni comando,
   ogni errore, con timestamp.
 - Istanza singola dell'app (Mutex).
+- Aggiornamenti: pulsante "Verifica aggiornamenti" nelle Impostazioni (solo su richiesta, solo a Tappo): controlla l'ultima release GitHub, scarica il Setup verificando lo SHA256 delle note, lo avvia e riapre l'app da sola.
 - SetThreadExecutionState per impedire standby e spegnimento schermo durante lo show.
 
 ---

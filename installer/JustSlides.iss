@@ -79,8 +79,45 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; IconFilename: "{a
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "Avvia {#AppName}"; Flags: nowait postinstall skipifsilent
+; Aggiornamento dall'app ("Verifica aggiornamenti"): la riapre da sola alla fine (parametro /RESTART=1)
+Filename: "{app}\{#AppExe}"; Flags: nowait runasoriginaluser; Check: RestartRequested
 
 [Code]
+// Aggiornamento dall'app: JustSlides avvia questo Setup con /WAITPID=<pid> e si chiude; si aspetta che il suo processo finisca.
+function OpenProcess(dwDesiredAccess: Cardinal; bInheritHandle: Integer; dwProcessId: Cardinal): THandle;
+  external 'OpenProcess@kernel32.dll stdcall';
+function WaitForSingleObject(hHandle: THandle; dwMilliseconds: Cardinal): Cardinal;
+  external 'WaitForSingleObject@kernel32.dll stdcall';
+function CloseHandle(hObject: THandle): Integer;
+  external 'CloseHandle@kernel32.dll stdcall';
+
+function RestartRequested: Boolean;
+begin
+  Result := ExpandConstant('{param:RESTART|0}') = '1';
+end;
+
+procedure WaitForAppProcess;
+var
+  Pid: Cardinal;
+  H: THandle;
+begin
+  Pid := StrToIntDef(ExpandConstant('{param:WAITPID|0}'), 0);
+  if Pid = 0 then Exit;
+  // SYNCHRONIZE = $00100000. Se il processo non esiste piu' (gia' chiuso) OpenProcess fallisce e si prosegue.
+  H := OpenProcess($00100000, 0, Pid);
+  if H <> 0 then
+  begin
+    WaitForSingleObject(H, 60000);
+    CloseHandle(H);
+  end;
+end;
+
+function InitializeSetup: Boolean;
+begin
+  WaitForAppProcess;
+  Result := True;
+end;
+
 // Cerca Microsoft.WindowsDesktop.App 10.x nelle posizioni standard del runtime x64.
 function DesktopRuntimeInstalled: Boolean;
 var
@@ -145,10 +182,21 @@ end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   Dir: String;
+  i: Integer;
 begin
   Result := '';
   // Chiusura garbata: solo avviso, mai terminare processi
   Dir := WizardDirValue;
+  // Dopo la chiusura dell'app PptHost e PowerPoint possono impiegare ancora qualche secondo a uscire (solo negli aggiornamenti dall'app)
+  if StrToIntDef(ExpandConstant('{param:WAITPID|0}'), 0) <> 0 then
+  begin
+    i := 0;
+    while AppFilesInUse(Dir) and (i < 30) do
+    begin
+      Sleep(500);
+      i := i + 1;
+    end;
+  end;
   if AppFilesInUse(Dir) then
   begin
     Result := 'JustSlides (o JustSlides.PptHost) e'' in esecuzione. Chiudere JustSlides e riprovare.';

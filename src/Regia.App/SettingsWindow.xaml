@@ -178,6 +178,37 @@
         </DockPanel>
         <CheckBox Margin="0,8,0,0" IsChecked="{Binding HardCut}" Content="Taglio secco (nessuna dissolvenza)" />
 
+        <!-- Aggiornamenti: solo su richiesta (nessun controllo all'avvio) -->
+        <TextBlock Text="Aggiornamenti" FontSize="15" FontWeight="SemiBold" Margin="0,22,0,6" />
+        <StackPanel DataContext="{Binding Updates}">
+          <TextBlock Text="{Binding InstalledText}" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,6" />
+          <TextBlock Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,8"
+                     Text="Controlla se su GitHub c'è una versione più nuova e, se vuoi, la scarica (con verifica del file) e la installa: JustSlides si chiude, compare la finestra di installazione e si riapre da solo. Si fa solo con la regia a Tappo." />
+          <Button Content="{Binding CheckButtonText}" Command="{Binding CheckCommand}" HorizontalAlignment="Left" Padding="16,8" />
+          <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Margin="0,10,0,0" Visibility="{Binding HasStatus, Converter={StaticResource BoolToVis}}">
+            <TextBlock.Style>
+              <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding StatusIsError}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource WarnTextBrush}" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
+          <ProgressBar Minimum="0" Maximum="100" Value="{Binding Progress}" Height="8" Margin="0,8,0,0"
+                       Visibility="{Binding ShowProgress, Converter={StaticResource BoolToVis}}" />
+          <Border Margin="0,10,0,0" CornerRadius="6" Padding="12,10" BorderThickness="1" MaxHeight="150"
+                  Background="{StaticResource OkBgBrush}" BorderBrush="{StaticResource OkBorderBrush}"
+                  Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVis}}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+              <TextBlock Text="{Binding Notes}" TextWrapping="Wrap" />
+            </ScrollViewer>
+          </Border>
+          <Button Content="{Binding InstallButtonText}" Command="{Binding InstallCommand}" HorizontalAlignment="Left" Padding="16,8"
+                  Margin="0,10,0,0" Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVis}}" />
+        </StackPanel>
+
         <!-- Tasti: globali dell'app, si salvano subito -->
         <TextBlock Text="Tasti" FontSize="15" FontWeight="SemiBold" Margin="0,22,0,6" />
         <TextBlock Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,8"

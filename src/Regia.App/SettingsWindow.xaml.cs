@@ -15,7 +15,11 @@ public partial class SettingsWindow : Window
         DataContext = viewModel;
 
         // Una verifica di PowerPoint ancora in corso non deve restare appesa alla finestra chiusa.
-        Closed += (_, _) => _viewModel.CancelPptCheck();
+        Closed += (_, _) =>
+        {
+            _viewModel.CancelPptCheck();
+            _viewModel.Updates?.Cancel();
+        };
     }
 
     // Con "Premi un tasto" attivo ogni tasto va all'editor dei tasti (anche Spazio e Invio, che altrimenti premerebbero un pulsante).
