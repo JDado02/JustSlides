@@ -1,11 +1,11 @@
 # JustSlides — Specifica di progetto
 
-Software di regia congressuale per Windows 11: l'operatore carica i file (PPT, PDF, MP4, JPG/PNG),
+Software di regia congressuale per Windows 11 (e Windows 10 22H2): l'operatore carica i file (PPT, PDF, MP4, JPG/PNG),
 li vede in Preview e li manda in onda su un monitor di Output, sempre passando per un "Tappo"
 con dissolvenza morbida. Priorità assoluta: stabilità. La regia non deve MAI bloccarsi o chiudersi
 per colpa di un media.
 
-Stack: C# / WPF / .NET 10 LTS, solo Windows 11 x64.
+Stack: C# / WPF / .NET 10 LTS, Windows 11 x64 e Windows 10 22H2 x64.
 
 ---
 
