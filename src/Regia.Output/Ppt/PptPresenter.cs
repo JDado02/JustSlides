@@ -79,6 +79,7 @@ public sealed class PptPresenter : ISlideShowContent
             var first = PptProtocol.ReadData<StartShowResult>(started);
             _page = new PageInfo(Math.Max(first?.Slide ?? 1, 1), first?.Total ?? open.Slides);
             _started = true;
+            Loops = first?.Loop ?? false;
             _output.AttachShowWindow(first?.Hwnd ?? 0);
 
             _client.SlideChanged += OnSlideChanged;
@@ -91,13 +92,15 @@ public sealed class PptPresenter : ISlideShowContent
             GiveFocusBackToRegia();
 
             PageChanged?.Invoke();
-            Log.Information("Slideshow pronto: {Path} (slide {Slide}/{Total})", _path, _page.Value.Current, _page.Value.Total);
+            Log.Information("Slideshow pronto: {Path} (slide {Slide}/{Total}{Loop})", _path, _page.Value.Current, _page.Value.Total, Loops ? ", ciclo continuo" : "");
         }
         catch (PptException ex) when (ex.IsForeignInstance)
         {
             throw new InvalidOperationException(ex.Message, ex);
         }
     }
+
+    public bool Loops { get; private set; }
 
     public bool Next() => Navigate(PptCommands.Next);
 

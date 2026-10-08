@@ -142,6 +142,7 @@ public class WaveControllerTests
         public int NextCount { get; private set; }
         public int Volume { get; private set; } = -1;
         public bool Muted { get; private set; }
+        public bool Loops => false;
         public List<TimeSpan> Fades { get; } = [];
         public PageInfo? Page { get; private set; } = new(1, 5);
 

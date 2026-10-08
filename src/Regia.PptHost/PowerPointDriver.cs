@@ -237,7 +237,9 @@ internal sealed class PowerPointDriver
         var settings = _presentation.SlideShowSettings;
         settings.ShowType = args.Windowed ? 2 : 1;   // ppShowTypeWindow (solo simulazione) / ppShowTypeSpeaker. MAI Kiosk.
         settings.ShowPresenterView = 0;
-        settings.LoopUntilStopped = 0;
+        // "Ciclo continuo fino a Esc" è un'impostazione del file: si rispetta (oltre l'ultima slide si ricomincia).
+        _loop = ReadLoop(settings);
+        settings.LoopUntilStopped = _loop ? -1 : 0;
         if (args.Windowed)
             TrySet(() => settings.ShowScrollbar = 0); // solo simulazione: niente barra di scorrimento nella finestra
 
@@ -273,7 +275,7 @@ internal sealed class PowerPointDriver
 
         Log.Information("Slideshow avviato (hwnd 0x{Hwnd:X}, {Mode}, rettangolo {X},{Y} {W}x{H})",
             _showHwnd.ToInt64(), args.Windowed ? "finestra" : "schermo intero", args.X, args.Y, args.Width, args.Height);
-        return new StartShowResult(_lastPosition, _total, _showHwnd.ToInt64());
+        return new StartShowResult(_lastPosition, _total, _showHwnd.ToInt64(), _loop);
     }
 
     /// <summary>
@@ -328,7 +330,14 @@ internal sealed class PowerPointDriver
         var view = RequireView();
 
         int position = view.CurrentShowPosition;
-        SlideMove move = SlideNavigator.DecideNext(position, _total, ClicksRemaining((object)view));
+        SlideMove move = SlideNavigator.DecideNext(position, _total, ClicksRemaining((object)view), _loop);
+        if (move == SlideMove.Restart)
+        {
+            Log.Information("Avanti sull'ultima slide ({Position}/{Total}) con ciclo continuo: si ricomincia dalla prima", position, _total);
+            view.GotoSlide(1);
+            return Moved((object)view);
+        }
+
         if (move == SlideMove.AtEnd)
         {
             // Non si chiama Next: PowerPoint mostrerebbe la schermata nera "Fine della presentazione".
@@ -422,6 +431,20 @@ internal sealed class PowerPointDriver
     private long _firstPollFailureTick;
 
     /// <summary>Stato della vista dello slideshow (<c>View.State</c>); 0 se non leggibile.</summary>
+    private bool _loop;
+
+    private static bool ReadLoop(dynamic settings)
+    {
+        try
+        {
+            return (int)settings.LoopUntilStopped != 0;
+        }
+        catch (Exception ex) when (ex is COMException or Microsoft.CSharp.RuntimeBinder.RuntimeBinderException)
+        {
+            return false;
+        }
+    }
+
     private int ReadViewState()
     {
         try

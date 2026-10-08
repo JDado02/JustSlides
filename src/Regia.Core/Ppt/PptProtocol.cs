@@ -83,7 +83,7 @@ public sealed record StartShowArgs(string? GdiDeviceName, int X, int Y, int Widt
 public sealed record SlideChangedData(int Slide, int Total);
 
 /// <summary>Risposta a StartShow: slide iniziale e finestra dello slideshow (serve alla regia per tenerla sotto il Tappo).</summary>
-public sealed record StartShowResult(int Slide, int Total, long Hwnd);
+public sealed record StartShowResult(int Slide, int Total, long Hwnd, bool Loop = false);
 
 /// <summary>Fine dello slideshow decisa da PowerPoint. <c>Faulted</c> = PowerPoint è morto o non risponde più (non è una fine normale).</summary>
 public sealed record ShowEndedData(bool Faulted, string? Reason);

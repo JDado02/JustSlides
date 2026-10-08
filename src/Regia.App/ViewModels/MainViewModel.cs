@@ -263,7 +263,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>"Pagina N/M" per i PDF; vuoto per i contenuti senza pagine.</summary>
     public string PageText => _wave.Page is { } page
-        ? $"{(_wave.CurrentItem?.Kind == MediaKind.Ppt ? "Slide" : "Pagina")} {page.Current} / {page.Total}"
+        ? $"{(_wave.CurrentItem?.Kind == MediaKind.Ppt ? "Slide" : "Pagina")} {page.Current} / {page.Total}{(_wave.IsLooping ? "  ↻ ciclo" : "")}"
         : "";
 
     public bool HasPage => _wave.Page is not null;

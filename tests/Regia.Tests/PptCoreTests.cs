@@ -54,10 +54,10 @@ public class PptProtocolTests
     [Fact]
     public void StartShowResult_CarriesWindowHandle()
     {
-        var line = PptProtocol.Serialize(PptProtocol.Success(9, new StartShowResult(1, 12, 0x230916)));
+        var line = PptProtocol.Serialize(PptProtocol.Success(9, new StartShowResult(1, 12, 0x230916, true)));
 
         Assert.True(PptProtocol.TryParse(line, out var message));
-        Assert.Equal(new StartShowResult(1, 12, 0x230916), PptProtocol.ReadData<StartShowResult>(message));
+        Assert.Equal(new StartShowResult(1, 12, 0x230916, true), PptProtocol.ReadData<StartShowResult>(message));
     }
 
     [Fact]
@@ -131,6 +131,16 @@ public class SlideNavigatorTests
     public void DecideNext(int position, int total, int clicksRemaining, SlideMove expected)
     {
         Assert.Equal(expected, SlideNavigator.DecideNext(position, total, clicksRemaining));
+    }
+
+    [Theory]
+    [InlineData(5, 5, 0, SlideMove.Restart)]     // ciclo continuo: dopo l'ultima si ricomincia
+    [InlineData(5, 5, 2, SlideMove.Advance)]     // ma prima si finiscono le animazioni
+    [InlineData(4, 5, 0, SlideMove.Advance)]
+    [InlineData(1, 1, 0, SlideMove.Restart)]
+    public void DecideNext_WithLoop(int position, int total, int clicksRemaining, SlideMove expected)
+    {
+        Assert.Equal(expected, SlideNavigator.DecideNext(position, total, clicksRemaining, loop: true));
     }
 
     [Theory]

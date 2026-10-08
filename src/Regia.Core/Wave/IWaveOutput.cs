@@ -79,6 +79,8 @@ public interface IAudioContent : ILiveContent
 /// </summary>
 public interface ISlideShowContent : IAudioContent
 {
+    /// <summary>La presentazione è a ciclo continuo: oltre l'ultima slide ricomincia, non finisce da sola.</summary>
+    bool Loops { get; }
 }
 
 /// <summary>

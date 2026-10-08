@@ -38,6 +38,9 @@ public sealed class WaveController
 
     public PageInfo? Page => _current?.Page;
 
+    /// <summary>Il PowerPoint in onda è a ciclo continuo.</summary>
+    public bool IsLooping => (_current as ISlideShowContent)?.Loops ?? false;
+
     /// <summary>Tempo trascorso / durata del video in onda; null per gli altri contenuti.</summary>
     public PlaybackProgress? Progress => _playback?.Progress;
 

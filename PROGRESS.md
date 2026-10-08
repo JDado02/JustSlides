@@ -275,6 +275,11 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 
 - **Windows 10 confermato dall'utente (2026-10-08)**: installer e app provati su un PC Windows 10 ("funziona"). Dettaglio di cosa è stato provato non comunicato (stress test, secondo monitor, PowerPoint): resta da verificare solo ciò che l'utente non ha esplicitamente provato.
 
+## Modifiche richieste dall'utente (2026-10-08, dopo Windows 10)
+- **"A fine video" solo sui video**: la riga in `MainWindow.xaml` ora è `Visibility=Collapsed` se la voce selezionata non è un video (era solo disattivata). Seconda eccezione alla regola M9 "disattivati, non nascosti" (la prima sono le frecce pagina). Collapsed: con PPT/PDF "Volume salvato" sale al suo posto.
+- **PowerPoint a ciclo continuo**: prima `StartShow` forzava `LoopUntilStopped = 0` e "avanti" sull'ultima slide dava `AtEnd` → Tappo. Ora `PowerPointDriver` legge `LoopUntilStopped` dal file (vale anche per `.ppsx`) e lo rispetta; `SlideNavigator.DecideNext(..., loop)` restituisce `SlideMove.Restart` e il driver fa `GotoSlide(1)` (mai `Next` oltre l'ultima slide). `StartShowResult.Loop` → `PptPresenter.Loops` (`ISlideShowContent.Loops`) → `WaveController.IsLooping` → il Program mostra "Slide N / M  ↻ ciclo". Si esce con T, pulsante Tappo o PANIC. Se il PowerPoint cicla da solo (clic sullo slideshow, tempi automatici) lo fa PowerPoint stesso e il poll non lo vede come fine.
+- Build 0 avvisi, 465 test verdi (nuovi: `DecideNext_WithLoop`). **Non provato dal vivo** con PowerPoint reale (ciclo e riga nascosta): da provare a mano.
+
 ## Prossimo passo
 M1–M9 sono completate e confermate, più, fuori milestone: Verifica PowerPoint e rinomina in **JustSlides** (confermata dall'utente: "sembra funzionare tutto", 2026-10-07, commit `c11dfbc`).
 

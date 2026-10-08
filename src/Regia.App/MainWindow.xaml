@@ -205,8 +205,9 @@
             <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SelectedItem.Speaker, UpdateSourceTrigger=LostFocus}"
                      IsEnabled="{Binding HasEditableSelection}" />
 
+            <!-- Solo con un video selezionato (Collapsed: con PPT/PDF non lascia spazio vuoto) -->
             <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,12,0,0"
-                        IsEnabled="{Binding IsSelectedVideo}">
+                        Visibility="{Binding IsSelectedVideo, Converter={StaticResource BoolToVis}}">
               <TextBlock Text="A fine video" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" Margin="0,0,12,0" />
               <RadioButton Content="Torna al Tappo" GroupName="VideoEnd" IsChecked="{Binding EndReturnToTappo}" />
               <RadioButton Content="Fermo" GroupName="VideoEnd" IsChecked="{Binding EndHoldLastFrame}"
