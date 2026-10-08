@@ -273,6 +273,8 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 
 - **Installer ricostruito e release aggiornata (2026-10-08)**: `tools\Build-Installer.ps1` → `artifacts\JustSlides-Setup-1.0.0.exe` (85 MB, SHA256 `76CDAB4648A0CCAB6BCDA3F40DEB1E26090A9DD2C2C962D6E9BEF2001F9C650C`), caricato come `JustSlides-Setup.exe` sulla release GitHub `v1.0.0` (`gh release upload --clobber`, sostituisce il vecchio del 2026-10-07; il link di download del README punta lì). Compilazione ok; il nuovo Setup **non è stato eseguito** (né su Windows 10 né su 11). Per le prossime release: ricostruire, copiare il file su `artifacts\JustSlides-Setup.exe` e rifare l'upload.
 
+- **Windows 10 confermato dall'utente (2026-10-08)**: installer e app provati su un PC Windows 10 ("funziona"). Dettaglio di cosa è stato provato non comunicato (stress test, secondo monitor, PowerPoint): resta da verificare solo ciò che l'utente non ha esplicitamente provato.
+
 ## Prossimo passo
 M1–M9 sono completate e confermate, più, fuori milestone: Verifica PowerPoint e rinomina in **JustSlides** (confermata dall'utente: "sembra funzionare tutto", 2026-10-07, commit `c11dfbc`).
 

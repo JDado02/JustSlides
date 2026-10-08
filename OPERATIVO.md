@@ -99,7 +99,7 @@ Show corrente: `%LOCALAPPDATA%\JustSlides\show.json`; archivi degli eventi passa
 - I `.ppt` vecchio formato hanno un controllo (pre-flight) limitato; le miniature PPT sono solo quelle incorporate nel file.
 - **Esc è un taglio netto**, senza dissolvenza: è voluto (deve comportarsi sempre allo stesso modo). Per un'uscita morbida usa **T**. Attenzione ai clicker il cui tasto "fine" manda Esc.
 - Se apri PowerPoint *dopo* l'avvio della regia, la tua apertura si unisce alla stessa istanza (non rilevabile): vedi regola d'oro 1.
-- **Windows 10**: supportato solo 22H2 (build 19045), ma **non ancora provato su un PC Windows 10 vero** (sviluppo su Windows 11). Windows 10 è fuori supporto Microsoft dal 14/10/2025 (aggiornamenti ESU per privati fino al 13/10/2026): usare un PC di regia dedicato, poco esposto in rete. Prima di un evento su Windows 10 fare una prova completa (installazione, `--stress 20 --faults`, tutti i tipi di file, secondo monitor).
+- **Windows 10**: supportato solo 22H2 (build 19045), provato dall'utente su un PC Windows 10 (installazione e uso: funziona; non verificato nel dettaglio: stress test e secondo monitor). Windows 10 è fuori supporto Microsoft dal 14/10/2025 (aggiornamenti ESU per privati fino al 13/10/2026): usare un PC di regia dedicato, poco esposto in rete. Prima di un evento su Windows 10 fare una prova completa (installazione, `--stress 20 --faults`, tutti i tipi di file, secondo monitor).
 
 ---
 
