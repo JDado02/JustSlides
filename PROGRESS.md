@@ -271,6 +271,8 @@ Integra CLAUDE.md (specifica e regole di lavoro). Aggiornare a fine di ogni mile
 - **Modifica**: solo `installer\JustSlides.iss` `MinVersion=10.0.19045` (era 10.0.22000, bloccava il Setup), più testo in CLAUDE.md, README.md, OPERATIVO.md §4. Nessun codice C#.
 - **NON provato** (sviluppo su Windows 11): installazione, avvio, font/icone, stress, PowerPoint, VLC, PDF e DWM su un Windows 10 vero. Windows 10 è fuori supporto (ESU privati fino al 13/10/2026). Checklist di prova nel piano: installazione su PC senza .NET 10, `--stress 20 --faults`, tutti i tipi di file, secondo monitor.
 
+- **Installer ricostruito e release aggiornata (2026-10-08)**: `tools\Build-Installer.ps1` → `artifacts\JustSlides-Setup-1.0.0.exe` (85 MB, SHA256 `76CDAB4648A0CCAB6BCDA3F40DEB1E26090A9DD2C2C962D6E9BEF2001F9C650C`), caricato come `JustSlides-Setup.exe` sulla release GitHub `v1.0.0` (`gh release upload --clobber`, sostituisce il vecchio del 2026-10-07; il link di download del README punta lì). Compilazione ok; il nuovo Setup **non è stato eseguito** (né su Windows 10 né su 11). Per le prossime release: ricostruire, copiare il file su `artifacts\JustSlides-Setup.exe` e rifare l'upload.
+
 ## Prossimo passo
 M1–M9 sono completate e confermate, più, fuori milestone: Verifica PowerPoint e rinomina in **JustSlides** (confermata dall'utente: "sembra funzionare tutto", 2026-10-07, commit `c11dfbc`).
 
