@@ -180,7 +180,7 @@
           <TextBlock Text="SCALETTA" Style="{StaticResource SectionLabel}" VerticalAlignment="Center" />
         </DockPanel>
 
-        <!-- Dettagli della voce selezionata: sempre presenti, disattivati se non servono -->
+        <!-- Dettagli della voce selezionata: sessione e relatore sempre presenti; "A fine video" e "Volume salvato" solo se servono -->
         <Border DockPanel.Dock="Bottom" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,8,0,0">
           <Grid>
@@ -215,7 +215,8 @@
               <RadioButton Content="Loop" GroupName="VideoEnd" IsChecked="{Binding EndLoop}" Margin="0" />
             </StackPanel>
 
-            <DockPanel Grid.Row="3" Grid.ColumnSpan="2" Margin="0,10,0,0" IsEnabled="{Binding IsSelectedAudio}">
+            <DockPanel Grid.Row="3" Grid.ColumnSpan="2" Margin="0,10,0,0"
+                       Visibility="{Binding IsSelectedAudio, Converter={StaticResource BoolToVis}}">
               <TextBlock DockPanel.Dock="Left" Text="Volume salvato" Foreground="{StaticResource MutedBrush}"
                          VerticalAlignment="Center" Margin="0,0,12,0" />
               <TextBlock DockPanel.Dock="Right" Width="44" TextAlignment="Right" VerticalAlignment="Center"
@@ -383,7 +384,8 @@
                 </ItemsControl>
               </ScrollViewer>
 
-              <ListBox ItemsSource="{Binding Pages}" BorderThickness="0" Background="Transparent"
+              <ListBox ItemsSource="{Binding Pages}" SelectedItem="{Binding SelectedPage, Mode=TwoWay}"
+                       BorderThickness="0" Background="Transparent"
                        ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Auto">
                 <ListBox.Style>
                   <Style TargetType="ListBox" BasedOn="{StaticResource {x:Type ListBox}}">
@@ -401,9 +403,28 @@
                   </ItemsPanelTemplate>
                 </ListBox.ItemsPanel>
                 <ListBox.ItemContainerStyle>
-                  <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
-                    <Setter Property="Padding" Value="3,2" />
-                    <Setter Property="Focusable" Value="False" />
+                  <Style TargetType="ListBoxItem">
+                    <Setter Property="Margin" Value="0,0,4,6" />
+                    <Setter Property="Cursor" Value="Hand" />
+                    <Setter Property="Template">
+                      <Setter.Value>
+                        <ControlTemplate TargetType="ListBoxItem">
+                          <Border x:Name="Bd" Background="Transparent" BorderBrush="Transparent" BorderThickness="2"
+                                  CornerRadius="4" Padding="3,2">
+                            <ContentPresenter />
+                          </Border>
+                          <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                              <Setter TargetName="Bd" Property="Background" Value="{StaticResource HoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                              <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PreviewFrameBrush}" />
+                              <Setter TargetName="Bd" Property="Background" Value="{StaticResource SelectionBrush}" />
+                            </Trigger>
+                          </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                      </Setter.Value>
+                    </Setter>
                   </Style>
                 </ListBox.ItemContainerStyle>
                 <ListBox.ItemTemplate>
@@ -517,6 +538,16 @@
 
             <!-- Video: countdown, Play/Pausa, scorrimento (attivi solo con un video in onda) -->
             <Grid Grid.Row="0" IsEnabled="{Binding IsVideoOnAir}">
+              <Grid.Style>
+                <Style TargetType="Grid">
+                  <Setter Property="Visibility" Value="Hidden" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsVideoOnAir}" Value="True">
+                      <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Grid.Style>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="170" />
                 <ColumnDefinition Width="*" />
@@ -543,6 +574,16 @@
 
             <!-- Audio (video e PowerPoint): volume dal vivo e Mute -->
             <DockPanel Grid.Row="2" IsEnabled="{Binding IsAudioOnAir}">
+              <DockPanel.Style>
+                <Style TargetType="DockPanel">
+                  <Setter Property="Visibility" Value="Hidden" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsAudioOnAir}" Value="True">
+                      <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </DockPanel.Style>
               <TextBlock DockPanel.Dock="Left" Text="Volume ora" Foreground="{StaticResource MutedBrush}" Width="92"
                          VerticalAlignment="Center" ToolTip="Volume dal vivo: vale solo per questa messa in onda" />
               <CheckBox DockPanel.Dock="Right" Content="Mute" IsChecked="{Binding IsMuted}" VerticalAlignment="Center"

@@ -61,6 +61,58 @@ public class TappoSlidesTests
     }
 
     [Fact]
+    public void ImagePaths_Normalized_PulisceVuoteEDoppioniEAllineaPath()
+    {
+        var tappo = new TappoSettings
+        {
+            Kind = TappoKind.Image,
+            Path = @"C:\vecchia.png",
+            ImagePaths = [@" C:\img1.png ", "", "  ", @"C:\IMG1.PNG", @"C:\img2.png"]
+        }.Normalized();
+
+        Assert.Equal([@"C:\img1.png", @"C:\img2.png"], tappo.ImagePaths);
+        Assert.Equal(@"C:\img1.png", tappo.Path);
+        Assert.Equal(tappo.ImagePaths, tappo.EffectiveImages);
+    }
+
+    [Fact]
+    public void ImagePaths_VecchioShow_UsaSoloPath()
+    {
+        var tappo = new TappoSettings { Kind = TappoKind.Image, Path = @"C:\tappo.png" }.Normalized();
+
+        Assert.Empty(tappo.ImagePaths);
+        Assert.Equal([@"C:\tappo.png"], tappo.EffectiveImages);
+        Assert.Empty(new TappoSettings().Normalized().EffectiveImages);
+    }
+
+    [Fact]
+    public void ImagePaths_SalvataggioERilettura_ShowStore()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "tappo-img-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new Regia.Core.Show.ShowStore(Path.Combine(dir, "show.json"));
+            var show = new Regia.Core.Show.ShowDocument
+            {
+                Settings = new AppSettings
+                {
+                    Tappo = new TappoSettings { Kind = TappoKind.Image, ImagePaths = [@"C:\img1.png", @"C:\img2.png"], SlideSeconds = 4 }
+                }
+            };
+            store.Save(show);
+
+            var loaded = store.Load().Settings.Tappo;
+            Assert.Equal([@"C:\img1.png", @"C:\img2.png"], loaded.ImagePaths);
+            Assert.Equal(4, loaded.SlideSeconds);
+        }
+        finally
+        {
+            if (Directory.Exists(dir))
+                Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Defaults_AreLoopSixSeconds()
     {
         var tappo = new TappoSettings();

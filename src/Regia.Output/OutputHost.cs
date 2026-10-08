@@ -397,25 +397,39 @@ public sealed class OutputHost : IDisposable
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(settings.Path))
+        var wanted = settings.Kind == TappoKind.Image ? settings.EffectiveImages : (IReadOnlyList<string>)(string.IsNullOrWhiteSpace(settings.Path) ? [] : [settings.Path]);
+        if (wanted.Count == 0)
         {
             Log.Information("Nessun file Tappo configurato: Tappo nero");
             return;
         }
 
-        if (!File.Exists(settings.Path))
+        if (!wanted.Any(File.Exists))
         {
-            Warning = $"File Tappo non trovato: {settings.Path}";
-            Log.Warning("File Tappo non trovato: {Path}", settings.Path);
+            Warning = $"File Tappo non trovato: {wanted[0]}";
+            Log.Warning("File Tappo non trovato: {Path}", wanted[0]);
             return;
+        }
+
+        // Tappo immagine con più immagini: loop con dissolvenza incrociata (si saltano quelle che non esistono più).
+        var images = settings.Kind == TappoKind.Image
+            ? settings.EffectiveImages.Where(File.Exists).ToList()
+            : [];
+        if (settings.Kind == TappoKind.Image && settings.EffectiveImages.Count > images.Count && images.Count > 0)
+        {
+            Warning = $"Alcune immagini del Tappo non sono state trovate ({settings.EffectiveImages.Count - images.Count}): le salto.";
+            Log.Warning("Immagini del Tappo mancanti: {Missing}", settings.EffectiveImages.Where(p => !File.Exists(p)).ToList());
         }
 
         ITappoSource? source = null;
         try
         {
-            source = settings.Kind == TappoKind.Video
-                ? new VideoTappoSource(_vlc, settings.Path)
-                : new ImageTappoSource(settings.Path);
+            if (images.Count >= 2)
+                source = new SlidesTappoSource(images, TappoSlidesMode.Loop, settings.SlideSeconds, 1, "Tappo immagini");
+            else
+                source = settings.Kind == TappoKind.Video
+                    ? new VideoTappoSource(_vlc, settings.Path)
+                    : new ImageTappoSource(images.Count == 1 ? images[0] : settings.Path);
 
             await source.AttachAsync(Tappo);
 

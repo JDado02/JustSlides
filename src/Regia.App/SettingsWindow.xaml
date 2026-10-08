@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ppt="clr-namespace:Regia.Core.Ppt;assembly=Regia.Core"
         Style="{StaticResource {x:Type Window}}"
-        Title="Impostazioni evento" Width="640" Height="700" MinWidth="520" MinHeight="560"
+        Title="Impostazioni evento" Width="920" Height="860" MinWidth="640" MinHeight="560"
         Icon="pack://application:,,,/Regia.Output;component/Assets/JustSlides.ico"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
   <Window.Resources>
@@ -67,11 +67,54 @@
           <RadioButton Content="PowerPoint (solo immagini)" IsChecked="{Binding IsSlidesTappo}" GroupName="TappoKind" Margin="0" />
         </StackPanel>
         <DockPanel>
-          <Button DockPanel.Dock="Right" Content="Sfoglia..." Margin="8,0,0,0" Command="{Binding BrowseTappoCommand}" />
+          <DockPanel.Style>
+            <Style TargetType="DockPanel">
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding IsImageTappo}" Value="True">
+                  <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </DockPanel.Style>
+          <Button DockPanel.Dock="Right" Content="Sfoglia..." Margin="8,0,0,0" Command="{Binding BrowseTappoCommand}"
+                  ToolTip="Scegli un'immagine (anche più di una), un video o una presentazione PowerPoint" />
           <TextBox Text="{Binding TappoPath, UpdateSourceTrigger=PropertyChanged}" />
         </DockPanel>
 
-        <!-- Tappo PowerPoint: visibile solo con quella scelta -->
+        <!-- Tappo immagine: una o più immagini (con due o più scorrono in loop) -->
+        <StackPanel Margin="0,8,0,0">
+          <StackPanel.Style>
+            <Style TargetType="StackPanel">
+              <Setter Property="Visibility" Value="Collapsed" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding IsImageTappo}" Value="True">
+                  <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </StackPanel.Style>
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Right" Margin="8,0,0,0">
+              <Button Content="Sfoglia..." Command="{Binding BrowseTappoCommand}" Padding="10,4"
+                      ToolTip="Sostituisce la lista; qui puoi scegliere anche un video o una presentazione PowerPoint" />
+              <Button Content="Aggiungi..." Command="{Binding AddTappoImagesCommand}" Padding="10,4" Margin="0,6,0,0" />
+              <Button Content="&#9650; Su" Command="{Binding MoveTappoImageUpCommand}" Padding="10,4" Margin="0,6,0,0" />
+              <Button Content="&#9660; Giù" Command="{Binding MoveTappoImageDownCommand}" Padding="10,4" Margin="0,6,0,0" />
+              <Button Content="Togli" Command="{Binding RemoveTappoImageCommand}" Padding="10,4" Margin="0,6,0,0" />
+            </StackPanel>
+            <ListBox ItemsSource="{Binding TappoImages}" SelectedItem="{Binding SelectedTappoImage}"
+                     MinHeight="70" MaxHeight="160" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ToolTip="Nessuna immagine = Tappo nero">
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" />
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </DockPanel>
+        </StackPanel>
+
+        <!-- Tappo PowerPoint: Loop / Fermo -->
         <StackPanel Margin="0,10,0,0">
           <StackPanel.Style>
             <Style TargetType="StackPanel">
@@ -85,20 +128,20 @@
           </StackPanel.Style>
           <StackPanel Orientation="Horizontal">
             <RadioButton Content="Loop" IsChecked="{Binding SlidesLoop}" GroupName="TappoSlidesMode" />
-            <RadioButton Content="Fermo su una slide" IsChecked="{Binding SlidesHold}" GroupName="TappoSlidesMode" Margin="0"
-                         ToolTip="Resta sulla slide scelta con le frecce a schermo nella regia; se la ricorda anche dopo un'onda" />
+            <RadioButton Content="Fermo su una slide" IsChecked="{Binding SlidesHold}" GroupName="TappoSlidesMode" Margin="0" />
           </StackPanel>
-          <DockPanel Margin="0,8,0,0">
-            <TextBlock DockPanel.Dock="Left" Text="Secondi per slide (loop)" Foreground="{StaticResource MutedBrush}"
-                       VerticalAlignment="Center" Margin="0,0,12,0" />
-            <TextBlock DockPanel.Dock="Right" Width="50" TextAlignment="Right" VerticalAlignment="Center"
-                       Text="{Binding SlideSeconds, StringFormat={}{0:0} s}" />
-            <Slider Minimum="{Binding MinSlideSeconds}" Maximum="{Binding MaxSlideSeconds}" Value="{Binding SlideSeconds}"
-                    TickFrequency="1" IsSnapToTickEnabled="True" SmallChange="1" LargeChange="5" VerticalAlignment="Center" />
-          </DockPanel>
-          <TextBlock Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,0"
-                     Text="Le slide vengono trasformate in immagini UNA volta, premendo Applica (con la regia a Tappo e senza PowerPoint aperto). Poi il Tappo usa solo le immagini: PowerPoint non c'entra più, nemmeno con PANIC o se si pianta. Animazioni, video e tempi delle slide non si vedono; le slide nascoste si saltano." />
         </StackPanel>
+
+        <!-- Secondi per slide/immagine: scritti a tastiera -->
+        <StackPanel Orientation="Horizontal" Margin="0,10,0,0" Visibility="{Binding ShowSeconds, Converter={StaticResource BoolToVis}}">
+          <TextBlock Text="{Binding SecondsLabel}" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" Margin="0,0,12,0" />
+          <TextBox Text="{Binding SlideSecondsText, UpdateSourceTrigger=PropertyChanged}" Width="70" MaxLength="3"
+                   TextAlignment="Right" PreviewTextInput="OnDigitsOnly" DataObject.Pasting="OnPasteDigitsOnly" />
+          <TextBlock Text="secondi (2-120)" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" Margin="10,0,0,0" />
+        </StackPanel>
+
+        <TextBlock Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0" Text="{Binding TappoNote}"
+                   Visibility="{Binding HasTappoNote, Converter={StaticResource BoolToVis}}" />
 
         <TextBlock Text="Uscita audio" FontSize="15" FontWeight="SemiBold" Margin="0,22,0,6" />
         <ListBox ItemsSource="{Binding AudioDevices}" SelectedItem="{Binding SelectedAudioDevice}"
@@ -121,7 +164,7 @@
         <!-- Verifica PowerPoint: solo su richiesta (nessun controllo all'avvio) -->
         <TextBlock Text="PowerPoint" FontSize="15" FontWeight="SemiBold" Margin="0,22,0,6" />
         <TextBlock Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,8"
-                   Text="Controlla che PowerPoint sia installato, attivato e pronto per la regia, con una prova di pochi secondi (avvia PowerPoint, crea, salva e riapre una presentazione di prova). Si fa solo con la regia a Tappo." />
+                   Text="Controlla che PowerPoint sia installato e funzioni, con una prova di pochi secondi (crea, salva e riapre una presentazione di prova). Solo con la regia a Tappo." />
         <Button Content="{Binding PptCheckButtonText}" Command="{Binding VerifyPptCommand}" HorizontalAlignment="Left" Padding="16,8" />
         <Border Margin="0,10,0,0" CornerRadius="6" Padding="12,10" BorderThickness="1"
                 Visibility="{Binding HasPptCheckResult, Converter={StaticResource BoolToVis}}">
@@ -182,8 +225,6 @@
         <TextBlock Text="Aggiornamenti" FontSize="15" FontWeight="SemiBold" Margin="0,22,0,6" />
         <StackPanel DataContext="{Binding Updates}">
           <TextBlock Text="{Binding InstalledText}" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,6" />
-          <TextBlock Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,8"
-                     Text="Controlla se su GitHub c'è una versione più nuova e, se vuoi, la scarica (con verifica del file) e la installa: JustSlides si chiude, compare la finestra di installazione e si riapre da solo. Si fa solo con la regia a Tappo." />
           <Button Content="{Binding CheckButtonText}" Command="{Binding CheckCommand}" HorizontalAlignment="Left" Padding="16,8" />
           <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Margin="0,10,0,0" Visibility="{Binding HasStatus, Converter={StaticResource BoolToVis}}">
             <TextBlock.Style>

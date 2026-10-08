@@ -1,5 +1,3 @@
-using System.Text.RegularExpressions;
-
 namespace Regia.Core.Ppt;
 
 /// <summary>Gravità dell'esito di "Verifica PowerPoint": verde = pronto, ambra = utilizzabile ma da controllare, rosso = non utilizzabile.</summary>
@@ -8,27 +6,6 @@ public enum PptCheckLevel
     Ok,
     Warning,
     Error
-}
-
-/// <summary>Stato di attivazione di Office come lo riporta OSPP.VBS (non esiste un'API documentata più diretta).</summary>
-public enum PptLicenseState
-{
-    /// <summary>Non leggibile (OSPP assente, versione dello Store, output non riconosciuto).</summary>
-    Unknown,
-
-    Licensed,
-
-    /// <summary>
-    /// PowerPoint usa una licenza che OSPP non elenca: un abbonamento Microsoft 365 legato all'account (non alla macchina).
-    /// OSPP vede solo le licenze del PC, quindi da fuori non si può confermare altro che "è quella in uso".
-    /// </summary>
-    LicensedPerUser,
-
-    /// <summary>Periodo di tolleranza (OOB/OOT/esteso): funziona, ma sta per scadere.</summary>
-    Grace,
-
-    /// <summary>Non attivato o notifiche di licenza: Office passa in "funzionalità ridotta" e può mostrare richieste di accesso.</summary>
-    NotLicensed
 }
 
 /// <summary>Come è andata la prova tecnica con PowerPoint.</summary>
@@ -53,20 +30,12 @@ public enum PptTestOutcome
 /// <summary>Cosa risulta installato (da file e registro, senza avviare PowerPoint).</summary>
 public sealed record PptInstallInfo(string ExePath, string? FileVersion, string? Platform, string? ProductIds);
 
-/// <summary>Un prodotto Office riportato da <c>OSPP.VBS /dstatus</c>.</summary>
-public sealed record OsppEntry(string Name, string Status, string? ErrorDescription, string? SkuId = null);
-
 /// <summary>Tutto ciò che la verifica ha raccolto; <see cref="PptReadiness.Evaluate"/> lo trasforma in un esito per l'operatore.</summary>
 public sealed record PptCheckFacts
 {
     public PptInstallInfo? Install { get; init; }
 
     public bool ForeignInstance { get; init; }
-
-    public PptLicenseState License { get; init; }
-
-    /// <summary>Nome del prodotto e dettaglio dell'attivazione, se leggibili.</summary>
-    public string? LicenseDetail { get; init; }
 
     public PptTestOutcome Test { get; init; }
 
@@ -80,8 +49,8 @@ public sealed record PptCheckReport(PptCheckLevel Level, string Summary, IReadOn
 
 /// <summary>
 /// Regole di "Verifica PowerPoint". La prova tecnica (avvio, creazione, salvataggio, apertura) è la verità sul fatto che la regia
-/// possa lavorare con PowerPoint; lo stato di attivazione è un'informazione a parte, perché Office in "funzionalità ridotta"
-/// può passare la prova tecnica e poi mostrare richieste di accesso in onda.
+/// possa lavorare con PowerPoint. La licenza non si legge: non esiste un'API documentata e dava falsi allarmi; se Office non è
+/// attivato lo si vede comunque dalla prova (salvataggio che fallisce, finestre di accesso che bloccano).
 /// </summary>
 public static class PptReadiness
 {
@@ -103,8 +72,6 @@ public static class PptReadiness
                 "PowerPoint è già aperto (non dalla regia): chiudilo e ripeti la verifica. La regia non si aggancia a un'istanza non sua.",
                 lines);
         }
-
-        AddLicenseLine(facts, lines);
 
         var test = facts.SelfTest;
         switch (facts.Test)
@@ -161,25 +128,7 @@ public static class PptReadiness
         lines.Add($"Prova tecnica: PowerPoint {version}{build} ha avviato, creato, salvato e riaperto in sola lettura una presentazione di prova in {test.ElapsedMs / 1000.0:0.0} s, senza finestre di dialogo.");
         lines.Add("Non verifica lo slideshow a schermo intero né i file veri dell'evento (usa il pre-flight della scaletta).");
 
-        return facts.License switch
-        {
-            PptLicenseState.NotLicensed => new PptCheckReport(PptCheckLevel.Warning,
-                "PowerPoint funziona, ma la licenza che sta usando risulta NON attiva. In questo stato può mostrare richieste di accesso o attivazione che bloccano la regia in onda: controllala prima dell'evento.",
-                lines),
-
-            PptLicenseState.Grace => new PptCheckReport(PptCheckLevel.Warning,
-                "PowerPoint funziona, ma l'attivazione è in periodo di tolleranza e sta per scadere: rinnovala prima dell'evento.",
-                lines),
-
-            PptLicenseState.Licensed => new PptCheckReport(PptCheckLevel.Ok,
-                $"PowerPoint {version} è installato, attivato e pronto per l'uso.", lines),
-
-            PptLicenseState.LicensedPerUser => new PptCheckReport(PptCheckLevel.Ok,
-                $"PowerPoint {version} è installato e pronto per l'uso. Usa la licenza dell'abbonamento Microsoft 365 legata all'account.", lines),
-
-            _ => new PptCheckReport(PptCheckLevel.Ok,
-                $"PowerPoint {version} è installato e risponde correttamente. Lo stato di attivazione non è leggibile da questo PC.", lines)
-        };
+        return new PptCheckReport(PptCheckLevel.Ok, $"PowerPoint {version} è installato e funziona: la prova è riuscita.", lines);
     }
 
     private static void AddInstallLines(PptCheckFacts facts, List<string> lines)
@@ -203,20 +152,6 @@ public static class PptReadiness
             lines.Add("Versione: " + string.Join(" · ", parts));
     }
 
-    private static void AddLicenseLine(PptCheckFacts facts, List<string> lines)
-    {
-        var state = facts.License switch
-        {
-            PptLicenseState.Licensed => "attivato",
-            PptLicenseState.LicensedPerUser => "abbonamento legato all'account",
-            PptLicenseState.Grace => "periodo di tolleranza",
-            PptLicenseState.NotLicensed => "NON attivato",
-            _ => "non leggibile"
-        };
-
-        lines.Add("Attivazione: " + state + (string.IsNullOrWhiteSpace(facts.LicenseDetail) ? "" : " — " + facts.LicenseDetail));
-    }
-
     private static string StepName(string step) => step switch
     {
         PptSelfTestSteps.Launch => "avvio",
@@ -226,131 +161,4 @@ public static class PptReadiness
         PptSelfTestSteps.Dialog => "finestra di dialogo",
         _ => step
     };
-}
-
-/// <summary>
-/// Legge l'output di <c>OSPP.VBS /dstatus</c> (script di Office). Le etichette dell'output sono in inglese qualunque sia la lingua di
-/// Windows; se non si riconoscono, lo stato resta <see cref="PptLicenseState.Unknown"/> (mai un falso "attivato").
-/// </summary>
-public static partial class OsppParser
-{
-    private static readonly Regex Relevant = RelevantRegex();
-
-    public static IReadOnlyList<OsppEntry> Parse(string? output)
-    {
-        var entries = new List<OsppEntry>();
-        if (string.IsNullOrWhiteSpace(output))
-            return entries;
-
-        string? name = null, status = null, error = null, sku = null;
-
-        void Flush()
-        {
-            if (name is not null && status is not null)
-                entries.Add(new OsppEntry(name, status, error, sku));
-            name = status = error = sku = null;
-        }
-
-        foreach (var raw in output.Split('\n'))
-        {
-            var line = raw.Trim();
-
-            // Nell'output l'SKU ID precede il nome: apre un nuovo prodotto.
-            if (line.StartsWith("SKU ID:", StringComparison.OrdinalIgnoreCase))
-            {
-                Flush();
-                sku = NormalizeSku(line["SKU ID:".Length..]);
-            }
-            else if (line.StartsWith("LICENSE NAME:", StringComparison.OrdinalIgnoreCase))
-            {
-                if (name is not null)
-                    Flush();
-
-                name = line["LICENSE NAME:".Length..].Trim();
-            }
-            else if (line.StartsWith("LICENSE STATUS:", StringComparison.OrdinalIgnoreCase))
-            {
-                status = line["LICENSE STATUS:".Length..].Trim().Trim('-').Trim();
-            }
-            else if (line.StartsWith("ERROR DESCRIPTION:", StringComparison.OrdinalIgnoreCase))
-            {
-                error = line["ERROR DESCRIPTION:".Length..].Trim();
-            }
-        }
-
-        Flush();
-        return entries;
-    }
-
-    /// <summary>"{3D0631E3-...}" e "3d0631e3-..." sono lo stesso SKU: si confrontano in minuscolo e senza graffe.</summary>
-    public static string NormalizeSku(string? sku) => (sku ?? "").Trim().Trim('{', '}').Trim().ToLowerInvariant();
-
-    /// <summary>
-    /// Stato della licenza che PowerPoint sta DAVVERO usando. OSPP elenca solo le licenze legate al PC: per un abbonamento Microsoft 365
-    /// legato all'account mostra una voce di tolleranza scaduta che non è quella in uso (verificato sul PC di sviluppo: la voce OSPP
-    /// era "grace period expired" mentre PowerPoint usava un altro SKU, attivo). Quindi: se uno degli SKU in uso da PowerPoint
-    /// (<paramref name="appSkus"/>, dal registro dell'utente) è nell'elenco OSPP, vale lo stato di quella voce; se nessuno c'è, la
-    /// licenza è a livello account (<see cref="PptLicenseState.LicensedPerUser"/>). Senza SKU in uso si ricade sulla sola sintesi OSPP.
-    /// </summary>
-    public static (PptLicenseState State, string? Detail) Resolve(IReadOnlyList<OsppEntry> entries, IReadOnlyCollection<string> appSkus)
-    {
-        var used = appSkus.Select(NormalizeSku).Where(s => s.Length > 0).ToHashSet();
-        if (used.Count == 0 || entries.Count == 0)
-            return Summarize(entries);
-
-        var matching = entries.Where(e => e.SkuId is { Length: > 0 } sku && used.Contains(NormalizeSku(sku))).ToList();
-        if (matching.Count > 0)
-            return Summarize(matching);
-
-        return (PptLicenseState.LicensedPerUser,
-            "la licenza in uso non è tra quelle del PC elencate da OSPP");
-    }
-
-    /// <summary>
-    /// Sintesi per PowerPoint: contano i prodotti che sembrano la suite Office (o PowerPoint); se nessuno lo sembra, tutti.
-    /// Vince il caso peggiore (un'altra applicazione non attivata nella stessa suite rende la suite non affidabile).
-    /// </summary>
-    public static (PptLicenseState State, string? Detail) Summarize(IReadOnlyList<OsppEntry> entries)
-    {
-        if (entries.Count == 0)
-            return (PptLicenseState.Unknown, null);
-
-        var relevant = entries.Where(e => Relevant.IsMatch(e.Name)).ToList();
-        if (relevant.Count == 0)
-            relevant = [.. entries];
-
-        var worst = relevant.OrderByDescending(e => Severity(e.Status)).First();
-        var state = Classify(worst.Status);
-        if (state == PptLicenseState.Unknown)
-            return (state, null);
-
-        var detail = worst.Name + " (" + worst.Status.ToLowerInvariant() + ")";
-        if (state != PptLicenseState.Licensed && !string.IsNullOrWhiteSpace(worst.ErrorDescription))
-            detail += ": " + worst.ErrorDescription;
-
-        return (state, detail);
-    }
-
-    public static PptLicenseState Classify(string? status)
-    {
-        var s = (status ?? "").Trim().Trim('-').Trim().ToUpperInvariant();
-        return s switch
-        {
-            "LICENSED" => PptLicenseState.Licensed,
-            "OOB_GRACE" or "OOT_GRACE" or "EXTENDED_GRACE" => PptLicenseState.Grace,
-            "UNLICENSED" or "NOTIFICATIONS" or "NONGENUINE_GRACE" => PptLicenseState.NotLicensed,
-            _ => PptLicenseState.Unknown
-        };
-    }
-
-    private static int Severity(string status) => Classify(status) switch
-    {
-        PptLicenseState.NotLicensed => 3,
-        PptLicenseState.Grace => 2,
-        PptLicenseState.Licensed => 1,
-        _ => 0
-    };
-
-    [GeneratedRegex("office|powerpoint|o365|microsoft 365", RegexOptions.IgnoreCase)]
-    private static partial Regex RelevantRegex();
 }

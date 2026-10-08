@@ -31,7 +31,7 @@ Stack: C# / WPF / .NET 10 LTS, Windows 11 x64 e Windows 10 22H2 x64.
   Roland / scaler). Nessun confidence monitor per il relatore.
 - Output tipico: 1080p (1920×1080). Il codice deve comunque adattarsi a qualsiasi risoluzione
   e aspect ratio (letterbox/pillarbox per contenuti 4:3 o diversi).
-- Tappo: immagine fissa, loop video OPPURE presentazione PowerPoint (esportata una volta in immagini: loop o fermo su una slide), scelto per evento nelle impostazioni.
+- Tappo: immagine fissa (anche più immagini in loop), loop video OPPURE presentazione PowerPoint (esportata una volta in immagini: loop o fermo su una slide), scelto per evento nelle impostazioni.
 - Uscita audio: cambia da evento a evento → selezione del dispositivo audio nelle impostazioni.
 
 ---

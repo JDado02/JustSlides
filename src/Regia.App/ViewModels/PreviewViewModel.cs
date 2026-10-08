@@ -57,6 +57,39 @@ public sealed partial class PreviewViewModel : ObservableObject
 
     public ObservableCollection<PdfPageThumb> Pages { get; } = [];
 
+    private PdfPageThumb? _selectedPage;
+    private CancellationTokenSource? _pageCts;
+
+    /// <summary>Pagina scelta nella striscia: appare grande nella Preview. Non tocca l'onda.</summary>
+    public PdfPageThumb? SelectedPage
+    {
+        get => _selectedPage;
+        set
+        {
+            if (!SetProperty(ref _selectedPage, value) || value is null || _item is not { Kind: MediaKind.Pdf } item)
+                return;
+
+            _ = ShowPageAsync(item, value.Number);
+        }
+    }
+
+    private async Task ShowPageAsync(MediaItem item, int number)
+    {
+        _pageCts?.Cancel();
+        var cts = _pageCts = new CancellationTokenSource();
+        var version = _version;
+        try
+        {
+            var image = await Task.Run(() => PdfPreview.RenderPageAsync(item.Path, number, ImageDecodeWidth, cts.Token), cts.Token);
+            if (image is not null && version == _version && ReferenceEquals(item, _item))
+                Image = image;
+        }
+        catch (OperationCanceledException)
+        {
+            // Altra pagina o altra voce scelta nel frattempo.
+        }
+    }
+
     public bool HasImage => Image is not null;
 
     public bool HasPages => Pages.Count > 0;
@@ -93,7 +126,9 @@ public sealed partial class PreviewViewModel : ObservableObject
         var token = _cts.Token;
         var item = _item;
 
+        _pageCts?.Cancel();
         Pages.Clear();
+        SelectedPage = null;
         OnPropertyChanged(nameof(HasPages));
 
         if (item is null)

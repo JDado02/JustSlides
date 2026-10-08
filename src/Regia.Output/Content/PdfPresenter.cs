@@ -15,7 +15,7 @@ namespace Regia.Output.Content;
 /// dell'output; il cambio pagina è a taglio secco. Se la pagina richiesta non è ancora pronta si
 /// aspetta il suo rendering (resta visibile la precedente) senza passare dal Tappo.
 /// </summary>
-public sealed class PdfPresenter : IContentPresenter
+public sealed class PdfPresenter : ILiveContent
 {
     // Pagine decodificate tenute in memoria: corrente ±2.
     private const int DecodedWindow = 2;
@@ -32,6 +32,7 @@ public sealed class PdfPresenter : IContentPresenter
     private int _index;
     private int _showVersion;
     private bool _closed;
+    private bool _endRaised;
 
     public PdfPresenter(ContentWindow window, string path, OutputSize size)
     {
@@ -43,6 +44,14 @@ public sealed class PdfPresenter : IContentPresenter
     public PageInfo? Page => _cache is null ? null : new PageInfo(_index + 1, _cache.PageCount);
 
     public event Action? PageChanged;
+
+    /// <summary>"Avanti" oltre l'ultima pagina: il controller riporta il Tappo (come la fine di un PPT o di un video).</summary>
+    public event Action? EndRequested;
+
+    // Un PDF non si rompe da solo: l'evento esiste solo per ILiveContent.
+#pragma warning disable CS0067
+    public event Action<Exception>? Faulted;
+#pragma warning restore CS0067
 
     public async Task LoadAsync(CancellationToken cancellationToken)
     {
@@ -90,7 +99,14 @@ public sealed class PdfPresenter : IContentPresenter
         if (_closed || _cache is null || _view is null)
             return false;
 
-        if (index < 0 || index >= _cache.PageCount)
+        if (index >= _cache.PageCount)
+        {
+            Log.Information("PDF: oltre l'ultima pagina ({Total}), ritorno al Tappo", _cache.PageCount);
+            RaiseEndDeferred();
+            return false;
+        }
+
+        if (index < 0)
         {
             Log.Information("PDF: nessuna pagina {Page} (totale {Total})", index + 1, _cache.PageCount);
             return false;
@@ -100,6 +116,20 @@ public sealed class PdfPresenter : IContentPresenter
         PageChanged?.Invoke();
         _ = ShowAsync(index, ++_showVersion);
         return true;
+    }
+
+    /// <summary>In differita: il controller sta ancora gestendo il comando "avanti" quando arriva la fine.</summary>
+    private void RaiseEndDeferred()
+    {
+        if (_endRaised)
+            return;
+
+        _endRaised = true;
+        _window.Dispatcher.BeginInvoke(() =>
+        {
+            if (!_closed)
+                EndRequested?.Invoke();
+        });
     }
 
     /// <summary>Mostra la pagina quando è pronta; vince sempre l'ultima richiesta.</summary>

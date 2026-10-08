@@ -11,6 +11,12 @@ public partial class SettingsWindow : Window
     public SettingsWindow(SettingsViewModel viewModel)
     {
         InitializeComponent();
+
+        // Finestra grande: quasi tutta l'area di lavoro (senza barra delle applicazioni), così si scorre il meno possibile.
+        var area = SystemParameters.WorkArea;
+        Width = Math.Min(Width, Math.Max(MinWidth, area.Width - 40));
+        Height = Math.Min(area.Height * 0.94, 1000);
+
         _viewModel = viewModel;
         DataContext = viewModel;
 
@@ -36,4 +42,13 @@ public partial class SettingsWindow : Window
     }
 
     private void OnCloseClick(object sender, RoutedEventArgs e) => Close();
+
+    // Campo dei secondi: solo cifre (anche incollando).
+    private void OnDigitsOnly(object sender, TextCompositionEventArgs e) => e.Handled = !e.Text.All(char.IsAsciiDigit);
+
+    private void OnPasteDigitsOnly(object sender, DataObjectPastingEventArgs e)
+    {
+        if (e.DataObject.GetData(DataFormats.UnicodeText) is not string text || !text.All(char.IsAsciiDigit))
+            e.CancelCommand();
+    }
 }

@@ -27,6 +27,16 @@ public sealed record TappoSettings
     /// <summary>Percorso del file immagine o video. Vuoto = Tappo nero.</summary>
     public string Path { get; init; } = "";
 
+    /// <summary>
+    /// Tappo immagine con più immagini in loop (con <see cref="SlideSeconds"/> per immagine). Vuota = si usa solo <see cref="Path"/>.
+    /// La prima è sempre uguale a <see cref="Path"/>.
+    /// </summary>
+    public IReadOnlyList<string> ImagePaths { get; init; } = [];
+
+    /// <summary>Immagini del Tappo: la lista se c'è, altrimenti il solo <see cref="Path"/>.</summary>
+    public IReadOnlyList<string> EffectiveImages =>
+        ImagePaths is { Count: > 0 } ? ImagePaths : string.IsNullOrWhiteSpace(Path) ? [] : [Path];
+
     public const int MinSlideSeconds = 2;
     public const int MaxSlideSeconds = 120;
 
@@ -45,9 +55,24 @@ public sealed record TappoSettings
     /// <summary>Numero di slide esportate.</summary>
     public int SlideCount { get; init; }
 
-    public TappoSettings Normalized() => this with
+    public TappoSettings Normalized()
     {
-        Path = Path ?? "",
+        var images = (ImagePaths ?? [])
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Select(p => p.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        // Con una lista, Path è la prima immagine; senza lista resta com'è (vecchi file show).
+        return (this with
+        {
+            ImagePaths = images.Count == 0 ? [] : images.ToArray(),
+            Path = images.Count > 0 ? images[0] : (Path ?? "")
+        }).NormalizedRest();
+    }
+
+    private TappoSettings NormalizedRest() => this with
+    {
         SlidesDir = SlidesDir ?? "",
         SlideSeconds = Math.Clamp(SlideSeconds, MinSlideSeconds, MaxSlideSeconds),
         SlideCount = Math.Max(SlideCount, 0),

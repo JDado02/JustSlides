@@ -24,9 +24,11 @@ public sealed class SlidesTappoSource : ITappoSource
     private int _version;
     private bool _frozen;
     private bool _disposed;
+    private readonly string _label;
 
-    public SlidesTappoSource(IReadOnlyList<string> files, TappoSlidesMode mode, int secondsPerSlide, int startIndex)
+    public SlidesTappoSource(IReadOnlyList<string> files, TappoSlidesMode mode, int secondsPerSlide, int startIndex, string label = "Tappo PowerPoint")
     {
+        _label = label;
         _files = files;
         _mode = mode;
         _index = Math.Clamp(startIndex, 1, Math.Max(files.Count, 1));
@@ -58,7 +60,7 @@ public sealed class SlidesTappoSource : ITappoSource
             return;
 
         window.Frame = first;
-        Log.Information("Tappo PowerPoint caricato: {Count} slide, {Mode}, slide {Index}", _files.Count, _mode, _index);
+        Log.Information("{Label} caricato: {Count} immagini, {Mode}, n. {Index}", _label, _files.Count, _mode, _index);
 
         if (_mode == TappoSlidesMode.Loop && _files.Count > 1)
             _timer.Start();
@@ -81,7 +83,7 @@ public sealed class SlidesTappoSource : ITappoSource
 
         _index = target;
         _window.Frame = bitmap;
-        Log.Information("Tappo PowerPoint: slide {Index}/{Count}", _index, _files.Count);
+        Log.Information("{Label}: {Index}/{Count}", _label, _index, _files.Count);
         IndexChanged?.Invoke();
         return true;
     }
@@ -106,7 +108,7 @@ public sealed class SlidesTappoSource : ITappoSource
         catch (Exception ex)
         {
             // Una slide illeggibile non deve fermare il Tappo: si salta e si prosegue.
-            Log.Warning(ex, "Tappo PowerPoint: slide {Index} non caricata", _index);
+            Log.Warning(ex, "{Label}: immagine {Index} non caricata", _label, _index);
         }
         finally
         {
