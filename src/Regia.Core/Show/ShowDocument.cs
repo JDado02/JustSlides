@@ -1,5 +1,6 @@
 using Regia.Core.Media;
 using Regia.Core.Settings;
+using Regia.Core.Timer;
 
 namespace Regia.Core.Show;
 
@@ -20,6 +21,9 @@ public sealed record ShowItemDto
     public VideoEndAction VideoEnd { get; init; } = VideoEndAction.ReturnToTappo;
 
     public bool Excluded { get; init; }
+
+    /// <summary>Timer del relatore; assente nei show delle versioni precedenti (= spento).</summary>
+    public SpeakerTimerSettings Timer { get; init; } = SpeakerTimerSettings.Default;
 
     /// <summary>Dimensione e data del file sorgente all'ultima copia riuscita (per riconoscere le modifiche al riavvio).</summary>
     public long SourceSize { get; init; }

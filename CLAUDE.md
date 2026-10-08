@@ -151,8 +151,14 @@ comandi non validi vengono ignorati e loggati. Testare la macchina a stati con x
   - stato onda ben visibile (colori: Tappo / In onda / Errore);
   - slide N/M e slide successiva per PPT, pagina N/M per PDF;
   - countdown video grande;
+  - timer del relatore (facoltativo, per contenuto, a scalare sull'output): vedi sotto;
   - Play / Pausa / Stop, fader audio, Mute;
   - pulsante PANIC grande.
+- **Timer del relatore** (dalla 1.3.0): il pannello sotto la scaletta imposta il timer per contenuto (attivo,
+  minuti:secondi, angolo, suono a 0, ricordati nel file show, "Applica a tutti") e non tocca ciò che è già in onda;
+  la riga sotto il Program ha i controlli dal vivo (metti/togli, ±1 min, pausa, riavvia, angolo, suono). Parte a
+  contenuto in onda, riparte a ogni GO, a zero continua in negativo; sull'output è una finestra trasparente
+  click-through posseduta dal Tappo (mai dentro il Tappo né sotto lo slideshow).
 - **Tasti**:
   - GO (Spazio o Invio) = manda in onda il file selezionato;
   - PANIC (Esc) = Tappo immediato da qualsiasi stato;

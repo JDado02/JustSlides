@@ -63,6 +63,12 @@ File: `JustSlides-Setup-<versione>.exe` (circa 85 MB, in `artifacts\` sul PC di 
 
 **Colori e banner**
 - Stato **Tappo** (neutro) / **In onda** / **Errore** (rosso). Dopo un errore la regia è già al Tappo e pronta: seleziona e premi GO.
+**Timer per i relatori** (facoltativo)
+- Sotto la scaletta, con la voce selezionata: casella **Timer**, minuti : secondi, **Suono a 0**, **Angolo** (↖ ↗ ↙ ↘) e **Applica a tutti** (copia il timer della voce a tutta la scaletta, con conferma). Si ricorda per ogni contenuto. Una voce con 0:00 o senza la spunta non ha timer. **Non cambia un contenuto già in onda**: vale dalla prossima messa in onda.
+- Parte quando il contenuto è davvero in onda, **riparte da capo a ogni GO**, sparisce con la dissolvenza al Tappo / T / Esc. A zero il contenuto resta in onda e il timer **continua in negativo (rosso)**; il suono suona una volta sola.
+- Sotto il Program (solo con qualcosa in onda): **Metti timer / Togli timer**, **−1 min / +1 min**, **Pausa**, **Riavvia**, angolo e suono: effetto immediato, solo per quella messa in onda (non cambiano ciò che è salvato). Se con +1 min si risale sopra lo zero, il suono può suonare di nuovo allo zero successivo.
+- Il suono esce dal dispositivo audio scelto per l'evento (Impostazioni); il Mute della regia non lo blocca.
+
 - Banner **rosso "OUTPUT SCOLLEGATO"**: il monitor di output non c'è. GO è rifiutato finché non torna.
 - Banner **arancione**: avviso (audio non predefinito, cartella contenuti, tasti globali non attivi...). Leggi il testo.
 - Banner **viola "STRESS TEST"**: stress in corso, non è uno show.
@@ -108,6 +114,7 @@ Show corrente: `%LOCALAPPDATA%\JustSlides\show.json`; archivi degli eventi passa
 
 Da fare una volta con il secondo monitor/proiettore vero e segnare l'esito:
 
+- [ ] **Timer del relatore** sul monitor reale: compare nell'angolo scelto sopra immagine, PDF, video e **slideshow PowerPoint a schermo intero** (sempre sopra), leggibile dal fondo sala (altezza ~7% dello schermo), sparisce con T/Esc; il suono esce dall'impianto dell'evento.
 - [ ] Output sul monitor giusto fin dal primo istante (mai un lampo sulla regia), dissolvenza senza lampi dello slideshow sopra il Tappo.
 - [ ] Anteprima dell'output nel Program (cattura ~5 fps) coerente con ciò che esce, senza scatti con un video 4K.
 - [ ] Hotplug: scollega/ricollega a Tappo, con un video e con un PPT in onda; matrice che cambia sorgente (nessun falso "tornato"); cambio risoluzione.

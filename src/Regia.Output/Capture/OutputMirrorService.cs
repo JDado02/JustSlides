@@ -61,7 +61,7 @@ public sealed class OutputMirrorService : IDisposable
             var (x, y, width, height) = AspectFit.Fit(area.Rect.Width, area.Rect.Height, output.Width, output.Height);
             var rect = new PixelRect(area.Rect.X + x, area.Rect.Y + y, width, height);
 
-            _mirror.Show(area.DestinationWindow, rect, [_output.MirrorBaseWindow, _output.MirrorTopWindow]);
+            _mirror.Show(area.DestinationWindow, rect, [_output.MirrorBaseWindow, _output.MirrorTopWindow, _output.MirrorTimerWindow]);
         }
         catch (Exception ex)
         {

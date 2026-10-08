@@ -119,6 +119,7 @@ public sealed class Scaletta
                 Speaker = i.Speaker,
                 Volume = i.Volume,
                 VideoEnd = i.VideoEnd,
+                Timer = i.Timer,
                 Excluded = i.Excluded,
                 SourceSize = i.SourceSize,
                 SourceMtimeUtc = i.SourceMtimeUtc
@@ -138,6 +139,7 @@ public sealed class Scaletta
             Speaker = dto.Speaker,
             Volume = dto.Volume,
             VideoEnd = dto.VideoEnd,
+            Timer = dto.Timer,
             Excluded = dto.Excluded,
             SourceSize = dto.SourceSize,
             SourceMtimeUtc = dto.SourceMtimeUtc,

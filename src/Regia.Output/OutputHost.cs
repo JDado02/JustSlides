@@ -1,6 +1,7 @@
 using System.IO;
 using Regia.Core.Monitors;
 using Regia.Core.Settings;
+using Regia.Core.Timer;
 using Regia.Output.Content;
 using Regia.Output.Input;
 using Regia.Output.Interop;
@@ -30,18 +31,23 @@ public sealed class OutputHost : IDisposable
     private bool _shown;
     private nint _showWindow;
     private bool _showAttached;
+    private bool _timerVisible;
 
     public OutputHost(VlcService vlc)
     {
         _vlc = vlc;
         Content = new ContentWindow();
         Tappo = new TappoWindow();
+        Overlay = new TimerOverlayWindow();
         Fader = new TappoFader(Tappo, () => _tappoSource);
     }
 
     public ContentWindow Content { get; }
 
     public TappoWindow Tappo { get; }
+
+    /// <summary>Timer del relatore: finestra trasparente sopra il Tappo, mostrata solo quando il timer è visibile.</summary>
+    public TimerOverlayWindow Overlay { get; }
 
     public TappoFader Fader { get; }
 
@@ -131,6 +137,7 @@ public sealed class OutputHost : IDisposable
         // Dopo Show WPF può aver riadattato la finestra: riapplico il rettangolo.
         Content.Placement.Set(rect, ZOrder.Unchanged);
         Tappo.Placement.Set(rect, ZOrder.Topmost);
+        SyncOverlay(ZOrder.Topmost);
 
         Log.Information("Output su monitor {Name} ({W}x{H} @ {X},{Y}, {Dpi} DPI)",
             monitor.FriendlyName, monitor.Width, monitor.Height, monitor.X, monitor.Y, monitor.Dpi);
@@ -168,6 +175,7 @@ public sealed class OutputHost : IDisposable
         // Né l'una né l'altra topmost; contenuto prima, Tappo dopo, così il Tappo sta sopra.
         Content.Placement.Set(rect.Value, ZOrder.NotTopmost);
         Tappo.Placement.Set(rect.Value, ZOrder.NotTopmost);
+        SyncOverlay(ZOrder.Unchanged);
     }
 
     private void DetachSimulation()
@@ -190,6 +198,54 @@ public sealed class OutputHost : IDisposable
         // proprietario, comunque si clicchi o si attivi qualcosa. Senza questo, un clic sul video (col Tappo
         // trasparente e click-through) portava il contenuto sopra il Tappo: al ritorno al Tappo restava lo schermo nero.
         WindowPlacement.SetOwner(Tappo, Content);
+
+        // Il timer è posseduto dal Tappo: sta sempre sopra di lui (e quindi sopra lo slideshow), senza toccarne la dissolvenza.
+        WindowPlacement.GetHandle(Overlay);
+        WindowPlacement.SetOwner(Overlay, Tappo);
+    }
+
+    /// <summary>
+    /// Mostra (o aggiorna) il timer del relatore sull'output. Chiamato più volte al secondo: se la finestra c'è già
+    /// aggiorna solo testo e colore. Mai eccezioni verso l'alto.
+    /// </summary>
+    public void ShowTimer(string text, TimerLevel level, TimerCorner corner)
+    {
+        try
+        {
+            if (!_shown)
+                return;
+
+            Overlay.SetState(text, level, corner);
+            if (_timerVisible)
+                return;
+
+            EnsureHandles();
+            _timerVisible = true;
+            SyncOverlay(Mode == OutputMode.Real ? ZOrder.Topmost : ZOrder.Top);
+            Overlay.Show();
+            SyncOverlay(Mode == OutputMode.Real ? ZOrder.Topmost : ZOrder.Top);
+        }
+        catch (Exception ex)
+        {
+            _timerVisible = false;
+            Log.Warning(ex, "Impossibile mostrare il timer sull'output");
+        }
+    }
+
+    /// <summary>Toglie il timer dall'output (idempotente).</summary>
+    public void HideTimer()
+    {
+        if (!_timerVisible)
+            return;
+
+        _timerVisible = false;
+        TryClose(() => Overlay.Hide());
+    }
+
+    private void SyncOverlay(ZOrder zOrder)
+    {
+        if (_timerVisible)
+            Overlay.Placement.Set(CurrentRect(), zOrder);
     }
 
     /// <summary>
@@ -202,6 +258,7 @@ public sealed class OutputHost : IDisposable
             return;
 
         _shown = false;
+        HideTimer();
         TryClose(() => Tappo.Hide());
         TryClose(() => Content.Hide());
         Log.Warning("Finestre di output nascoste: monitor di output non disponibile");
@@ -230,6 +287,7 @@ public sealed class OutputHost : IDisposable
         // sta sopra per costruzione. Simulazione: nessuna finestra di output è topmost, il Tappo viene riportato in cima a ogni
         // cambio di finestra attiva e la finestra della regia resta sopra a tutte (vedi AttachShowWindow): mai coperta dal Tappo.
         Tappo.Placement.Set(CurrentRect(), Mode == OutputMode.Real ? ZOrder.Topmost : ZOrder.Top);
+        SyncOverlay(Mode == OutputMode.Real ? ZOrder.Topmost : ZOrder.Top);
 
         // In simulazione la cornice (nera) non deve coprire lo slideshow: si mette dietro di lui (chiamata asincrona e mai
         // verso un PowerPoint che non risponde: un SetWindowPos verso una finestra bloccata potrebbe congelare la regia).
@@ -279,6 +337,7 @@ public sealed class OutputHost : IDisposable
         {
             Content.Placement.Set(rect, ZOrder.Topmost);
             Tappo.Placement.Set(rect, ZOrder.Topmost);
+            SyncOverlay(ZOrder.Topmost);
         }
         else
         {
@@ -332,9 +391,12 @@ public sealed class OutputHost : IDisposable
     /// <summary>Per lo specchio della simulazione: la finestra del Tappo (sopra a tutto).</summary>
     public nint MirrorTopWindow => HandleOf(Tappo);
 
+    /// <summary>Per lo specchio della simulazione: il timer sopra il Tappo (0 se non è visibile).</summary>
+    public nint MirrorTimerWindow => _timerVisible ? HandleOf(Overlay) : 0;
+
     /// <summary>Una delle nostre finestre di output (contenuto, Tappo, cornice di simulazione). Da chiamare sul thread UI.</summary>
     public bool IsOutputWindow(nint hwnd) =>
-        hwnd != 0 && (hwnd == HandleOf(Content) || hwnd == HandleOf(Tappo) || (_simulation is { } frame && hwnd == HandleOf(frame)));
+        hwnd != 0 && (hwnd == HandleOf(Content) || hwnd == HandleOf(Tappo) || hwnd == HandleOf(Overlay) ||(_simulation is { } frame && hwnd == HandleOf(frame)));
 
     private static nint HandleOf(System.Windows.Window window) => new System.Windows.Interop.WindowInteropHelper(window).Handle;
 
@@ -511,6 +573,7 @@ public sealed class OutputHost : IDisposable
         if (simulation is not null)
             simulation.ViewportChanged -= LayoutSimulation;
 
+        TryClose(() => Overlay.Close());
         TryClose(() => Tappo.Close());
         TryClose(() => Content.Close());
         TryClose(() => simulation?.CloseForReal());

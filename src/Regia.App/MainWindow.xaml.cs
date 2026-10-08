@@ -249,6 +249,10 @@ public partial class MainWindow : Window
         return source as ListBoxItem;
     }
 
+    // Minuti e secondi del timer: solo cifre.
+    private void OnTimerDigitsInput(object sender, TextCompositionEventArgs e) =>
+        e.Handled = e.Text.Any(c => !char.IsAsciiDigit(c));
+
     // Cursore di scorrimento del video: finché è afferrato la posizione non si aggiorna da sola.
     private void OnScrubStart(object sender, RoutedEventArgs e) => _viewModel.BeginScrub();
 

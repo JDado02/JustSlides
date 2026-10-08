@@ -327,6 +327,7 @@ public sealed class SourceFolderSync : IDisposable
         item.Speaker = old.Speaker;
         item.Volume = old.Volume;
         item.VideoEnd = old.VideoEnd;
+        item.Timer = old.Timer;
         item.Excluded = old.Excluded;
         if (old.SessionEdited)
         {

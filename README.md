@@ -13,6 +13,8 @@ Software di regia congressuale per Windows 11 e Windows 10 22H2 (x64): carichi P
 
 Dalla versione 1.1.1 gli aggiornamenti sono **automatici su richiesta**: Impostazioni → Aggiornamenti → *Verifica aggiornamenti* scarica e installa la versione nuova e riapre JustSlides da solo (non serve più scaricare nulla a mano da qui).
 
+Novità della versione 1.3.0: il **timer per i relatori**. Per ogni contenuto (facoltativo) puoi scrivere minuti e secondi, scegliere l'angolo dell'output in cui compare (cifre bianche, ambra sotto il minuto, rosse da zero in poi: oltre lo zero continua in negativo) e un **suono a zero** sul dispositivo audio dell'evento; il timer si ricorda per ogni contenuto e con **Applica a tutti** si copia a tutta la scaletta. Sotto il Program, mentre il contenuto è in onda, si può mettere o togliere il timer, aggiungere o togliere un minuto, fermarlo, riavviarlo e cambiare angolo e suono al volo (valgono solo per quella messa in onda).
+
 Novità della versione 1.2.1: il **Tappo immagine** ha la scelta **Fissa** (una sola immagine, sempre quella) o **Loop** (più immagini che scorrono); la striscia delle pagine del PDF in Preview non si allunga più verso il basso.
 
 Novità della versione 1.2.0: un **PDF che arriva all'ultima pagina e va "avanti" ancora torna da solo al Tappo** (come PowerPoint e video); nella Preview dei PDF le pagine si scelgono con un clic e appaiono grandi; il **Tappo immagine può avere più immagini in loop** (secondi per immagine a scelta); i secondi del Tappo si scrivono con la tastiera; Impostazioni più grandi e più essenziali; la verifica PowerPoint non legge più la licenza (solo prova tecnica); la barra video e il volume compaiono solo quando servono.

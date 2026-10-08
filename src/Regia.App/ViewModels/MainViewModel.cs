@@ -9,6 +9,7 @@ using Regia.Core.Input;
 using Regia.Core.Show;
 using Regia.Core.Media;
 using Regia.Core.Settings;
+using Regia.Core.Timer;
 using Regia.Core.Wave;
 using Regia.Output;
 using Regia.Output.Audio;
@@ -57,6 +58,14 @@ public sealed partial class MainViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(EndHoldLastFrame))]
     [NotifyPropertyChangedFor(nameof(EndLoop))]
     [NotifyPropertyChangedFor(nameof(SelectedVolume))]
+    [NotifyPropertyChangedFor(nameof(SelectedTimerEnabled))]
+    [NotifyPropertyChangedFor(nameof(SelectedTimerMinutes))]
+    [NotifyPropertyChangedFor(nameof(SelectedTimerSeconds))]
+    [NotifyPropertyChangedFor(nameof(SelectedTimerSound))]
+    [NotifyPropertyChangedFor(nameof(SelectedCornerTopLeft))]
+    [NotifyPropertyChangedFor(nameof(SelectedCornerTopRight))]
+    [NotifyPropertyChangedFor(nameof(SelectedCornerBottomLeft))]
+    [NotifyPropertyChangedFor(nameof(SelectedCornerBottomRight))]
     private MediaItem? _selectedItem;
 
     /// <summary>Volume del video in onda (cursore del pannello video).</summary>
@@ -102,6 +111,7 @@ public sealed partial class MainViewModel : ObservableObject
         _factory = factory;
         _ppt = ppt;
         Settings = settings;
+        LiveTimer = new TimerViewModel(wave, output, () => Settings.AudioDeviceId);
 
         ItemsView = CollectionViewSource.GetDefaultView(Items);
         ItemsView.Filter = o => ShowExcluded || o is not MediaItem { Excluded: true };
@@ -187,6 +197,9 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Cosa è in onda, prossima slide, etichette dei tasti.</summary>
     public ProgramViewModel Program { get; }
+
+    /// <summary>Timer del relatore in onda (pannello sotto il Program).</summary>
+    public TimerViewModel LiveTimer { get; }
 
     [ObservableProperty]
     private bool _showExcluded;
@@ -356,6 +369,113 @@ public sealed partial class MainViewModel : ObservableObject
     {
         get => SelectedItem?.VideoEnd == VideoEndAction.Loop;
         set => SetVideoEnd(value, VideoEndAction.Loop);
+    }
+
+    // ---- Timer del relatore della voce selezionata (salvato per file). Non tocca il timer del contenuto già in onda. ----
+
+    public bool SelectedTimerEnabled
+    {
+        get => SelectedItem?.Timer.Enabled ?? false;
+        set => UpdateSelectedTimer(t => t with { Enabled = value });
+    }
+
+    /// <summary>Minuti del timer (0-599), scritti a mano.</summary>
+    public string SelectedTimerMinutes
+    {
+        get => (SelectedItem?.Timer.Minutes ?? 10).ToString();
+        set => UpdateSelectedTimer(t => t with { DurationSeconds = ParseTimerPart(value, SpeakerTimerSettings.MaxMinutes, t.Minutes) * 60 + t.Seconds });
+    }
+
+    /// <summary>Secondi del timer (0-59), scritti a mano.</summary>
+    public string SelectedTimerSeconds
+    {
+        get => (SelectedItem?.Timer.Seconds ?? 0).ToString("00");
+        set => UpdateSelectedTimer(t => t with { DurationSeconds = t.Minutes * 60 + ParseTimerPart(value, 59, t.Seconds) });
+    }
+
+    public bool SelectedTimerSound
+    {
+        get => SelectedItem?.Timer.Sound ?? false;
+        set => UpdateSelectedTimer(t => t with { Sound = value });
+    }
+
+    public bool SelectedCornerTopLeft
+    {
+        get => (SelectedItem?.Timer.Corner ?? TimerCorner.BottomRight) == TimerCorner.TopLeft;
+        set => SetSelectedCorner(value, TimerCorner.TopLeft);
+    }
+
+    public bool SelectedCornerTopRight
+    {
+        get => (SelectedItem?.Timer.Corner ?? TimerCorner.BottomRight) == TimerCorner.TopRight;
+        set => SetSelectedCorner(value, TimerCorner.TopRight);
+    }
+
+    public bool SelectedCornerBottomLeft
+    {
+        get => (SelectedItem?.Timer.Corner ?? TimerCorner.BottomRight) == TimerCorner.BottomLeft;
+        set => SetSelectedCorner(value, TimerCorner.BottomLeft);
+    }
+
+    public bool SelectedCornerBottomRight
+    {
+        get => (SelectedItem?.Timer.Corner ?? TimerCorner.BottomRight) == TimerCorner.BottomRight;
+        set => SetSelectedCorner(value, TimerCorner.BottomRight);
+    }
+
+    private void SetSelectedCorner(bool selected, TimerCorner corner)
+    {
+        if (selected)
+            UpdateSelectedTimer(t => t with { Corner = corner });
+    }
+
+    /// <summary>Solo cifre; vuoto o non valido = valore di prima (la casella torna com'era). Sopra il massimo si ferma al massimo.</summary>
+    private static int ParseTimerPart(string? text, int max, int fallback) =>
+        int.TryParse(text?.Trim(), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var value)
+            ? Math.Clamp(value, 0, max)
+            : fallback;
+
+    private void UpdateSelectedTimer(Func<SpeakerTimerSettings, SpeakerTimerSettings> change)
+    {
+        if (SelectedItem is { IsFixed: false } item)
+        {
+            item.Timer = change(item.Timer);
+            Log.Information("Timer di {Item}: {Enabled}, {Minutes}:{Seconds:00}, angolo {Corner}, suono {Sound}",
+                item.DisplayName, item.Timer.Enabled ? "attivo" : "spento", item.Timer.Minutes, item.Timer.Seconds, item.Timer.Corner, item.Timer.Sound);
+        }
+
+        // Anche con un valore rifiutato le caselle devono tornare a mostrare quello vero.
+        OnPropertyChanged(nameof(SelectedTimerEnabled));
+        OnPropertyChanged(nameof(SelectedTimerMinutes));
+        OnPropertyChanged(nameof(SelectedTimerSeconds));
+        OnPropertyChanged(nameof(SelectedTimerSound));
+        OnPropertyChanged(nameof(SelectedCornerTopLeft));
+        OnPropertyChanged(nameof(SelectedCornerTopRight));
+        OnPropertyChanged(nameof(SelectedCornerBottomLeft));
+        OnPropertyChanged(nameof(SelectedCornerBottomRight));
+    }
+
+    /// <summary>Copia il timer della voce selezionata (attivo, durata, angolo, suono) a tutte le voci. Non tocca il contenuto in onda.</summary>
+    [RelayCommand]
+    private void ApplyTimerToAll()
+    {
+        if (SelectedItem is not { IsFixed: false } source)
+            return;
+
+        var timer = source.Timer;
+        var targets = Items.Where(i => !i.IsFixed).ToList();
+        var answer = MessageBox.Show(Application.Current?.MainWindow!,
+            $"Applicare il timer di \"{source.DisplayName}\" ({(timer.Enabled ? "attivo" : "spento")}, {timer.Minutes}:{timer.Seconds:00}, " +
+            $"{(timer.Sound ? "con suono" : "senza suono")}) a tutti i {targets.Count} contenuti?\n\n" +
+            "I contenuti già in onda non cambiano: il nuovo timer vale dalla prossima messa in onda.",
+            "Applica timer a tutti", MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel);
+        if (answer != MessageBoxResult.OK)
+            return;
+
+        foreach (var item in targets)
+            item.Timer = timer;
+
+        Log.Information("Timer di {Item} applicato a tutti i {Count} contenuti", source.DisplayName, targets.Count);
     }
 
     public string StateText => State switch

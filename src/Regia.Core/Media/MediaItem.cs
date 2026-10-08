@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Regia.Core.Timer;
 
 namespace Regia.Core.Media;
 
@@ -65,6 +66,7 @@ public sealed class MediaItem : INotifyPropertyChanged
     private bool _excluded;
     private VideoEndAction _videoEnd = VideoEndAction.ReturnToTappo;
     private int _volume = 100;
+    private SpeakerTimerSettings _timer = SpeakerTimerSettings.Default;
     private CopyState _copyState = CopyState.Ready;
     private int _copyProgress;
     private string _statusDetail = "";
@@ -139,6 +141,13 @@ public sealed class MediaItem : INotifyPropertyChanged
     {
         get => _volume;
         set => Set(ref _volume, value);
+    }
+
+    /// <summary>Timer del relatore di questo contenuto (facoltativo), ricordato per ogni file.</summary>
+    public SpeakerTimerSettings Timer
+    {
+        get => _timer;
+        set => Set(ref _timer, (value ?? SpeakerTimerSettings.Default).Normalize());
     }
 
     public CopyState CopyState

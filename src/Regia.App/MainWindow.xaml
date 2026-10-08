@@ -190,6 +190,7 @@
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
@@ -226,8 +227,36 @@
                       ToolTip="Volume con cui questo video o PowerPoint parte a ogni messa in onda (si ricorda per ogni file)" />
             </DockPanel>
 
+            <!-- Timer del relatore di questa voce (facoltativo, salvato per file). Non cambia il timer di ciò che è già in onda. -->
+            <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Margin="0,10,0,0" IsEnabled="{Binding HasEditableSelection}">
+              <StackPanel Orientation="Horizontal">
+                <CheckBox Content="Timer" IsChecked="{Binding SelectedTimerEnabled}" Margin="0,0,12,0" VerticalAlignment="Center"
+                          ToolTip="Timer a scalare sul monitor di output mentre questo contenuto è in onda" />
+                <TextBox Width="46" MaxLength="3" TextAlignment="Center" Padding="4,3" FontFamily="{StaticResource MonoFont}"
+                         Text="{Binding SelectedTimerMinutes, UpdateSourceTrigger=LostFocus}"
+                         PreviewTextInput="OnTimerDigitsInput" ToolTip="Minuti (0-599)" />
+                <TextBlock Text=":" Margin="4,0" VerticalAlignment="Center" FontFamily="{StaticResource MonoFont}" />
+                <TextBox Width="38" MaxLength="2" TextAlignment="Center" Padding="4,3" FontFamily="{StaticResource MonoFont}"
+                         Text="{Binding SelectedTimerSeconds, UpdateSourceTrigger=LostFocus}"
+                         PreviewTextInput="OnTimerDigitsInput" ToolTip="Secondi (0-59)" />
+                <CheckBox Content="Suono a 0" IsChecked="{Binding SelectedTimerSound}" Margin="16,0,0,0" VerticalAlignment="Center"
+                          ToolTip="Un suono sul dispositivo audio dell'evento quando il timer arriva a zero" />
+              </StackPanel>
+              <DockPanel Margin="0,8,0,0">
+                <Button DockPanel.Dock="Right" Content="Applica a tutti" Command="{Binding ApplyTimerToAllCommand}" Padding="10,3"
+                        ToolTip="Copia il timer di questa voce (attivo, durata, angolo, suono) a tutti i contenuti" />
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="Angolo" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                  <RadioButton GroupName="SavedTimerCorner" Content="&#x2196;" IsChecked="{Binding SelectedCornerTopLeft}" Margin="0,0,6,0" ToolTip="In alto a sinistra" />
+                  <RadioButton GroupName="SavedTimerCorner" Content="&#x2197;" IsChecked="{Binding SelectedCornerTopRight}" Margin="0,0,6,0" ToolTip="In alto a destra" />
+                  <RadioButton GroupName="SavedTimerCorner" Content="&#x2199;" IsChecked="{Binding SelectedCornerBottomLeft}" Margin="0,0,6,0" ToolTip="In basso a sinistra" />
+                  <RadioButton GroupName="SavedTimerCorner" Content="&#x2198;" IsChecked="{Binding SelectedCornerBottomRight}" Margin="0,0,6,0" ToolTip="In basso a destra" />
+                </StackPanel>
+              </DockPanel>
+            </StackPanel>
+
             <!-- Stato di PowerPoint/PptHost: riga sempre presente, visibile solo se c'è un PPT in lista -->
-            <TextBlock Grid.Row="4" Grid.ColumnSpan="2" Text="{Binding PptStatusText}" Margin="0,10,0,0" Height="18"
+            <TextBlock Grid.Row="5" Grid.ColumnSpan="2" Text="{Binding PptStatusText}" Margin="0,10,0,0" Height="18"
                        TextTrimming="CharacterEllipsis" Foreground="{StaticResource MutedBrush}">
               <TextBlock.Style>
                 <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
@@ -533,6 +562,8 @@
               <RowDefinition Height="56" />
               <RowDefinition Height="8" />
               <RowDefinition Height="30" />
+              <RowDefinition Height="8" />
+              <RowDefinition Height="34" />
               <RowDefinition Height="12" />
               <RowDefinition Height="64" />
             </Grid.RowDefinitions>
@@ -595,8 +626,60 @@
                       VerticalAlignment="Center" Margin="8,0" Focusable="False" />
             </DockPanel>
 
+            <!-- Timer del relatore dal vivo: solo con qualcosa in onda. Vale per questa messa in onda, non cambia il salvato. -->
+            <DockPanel Grid.Row="4" DataContext="{Binding LiveTimer}">
+              <DockPanel.Style>
+                <Style TargetType="DockPanel">
+                  <Setter Property="Visibility" Value="Hidden" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsOnAir}" Value="True">
+                      <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </DockPanel.Style>
+              <TextBlock DockPanel.Dock="Left" Width="96" VerticalAlignment="Center" Text="{Binding DisplayText}"
+                         FontSize="22" FontWeight="Bold" FontFamily="{StaticResource MonoFont}"
+                         ToolTip="Timer del relatore sull'output">
+                <TextBlock.Style>
+                  <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding IsActive}" Value="False">
+                        <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+                      </DataTrigger>
+                      <DataTrigger Binding="{Binding Level}" Value="Warning">
+                        <Setter Property="Foreground" Value="{StaticResource WarnTextBrush}" />
+                      </DataTrigger>
+                      <DataTrigger Binding="{Binding Level}" Value="Over">
+                        <Setter Property="Foreground" Value="{StaticResource PanicBorderBrush}" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </TextBlock.Style>
+              </TextBlock>
+              <Button DockPanel.Dock="Left" Content="{Binding ToggleText}" Command="{Binding ToggleCommand}" Width="104" Padding="0,4"
+                      ToolTip="Mette o toglie il timer sull'output (solo per questa messa in onda)" />
+              <Button DockPanel.Dock="Left" Content="&#8722;1 min" Command="{Binding SubtractMinuteCommand}" IsEnabled="{Binding CanAdjust}"
+                      Width="62" Padding="0,4" Margin="8,0,0,0" ToolTip="Toglie un minuto al timer" />
+              <Button DockPanel.Dock="Left" Content="+1 min" Command="{Binding AddMinuteCommand}" IsEnabled="{Binding CanAdjust}"
+                      Width="62" Padding="0,4" Margin="4,0,0,0" ToolTip="Aggiunge un minuto al timer" />
+              <Button DockPanel.Dock="Left" Content="{Binding PauseText}" Command="{Binding TogglePauseCommand}" IsEnabled="{Binding CanAdjust}"
+                      Width="76" Padding="0,4" Margin="8,0,0,0" />
+              <Button DockPanel.Dock="Left" Content="Riavvia" Command="{Binding RestartCommand}" IsEnabled="{Binding CanAdjust}"
+                      Width="64" Padding="0,4" Margin="4,0,0,0" ToolTip="Riparte dal tempo iniziale" />
+              <CheckBox DockPanel.Dock="Right" Content="Suono a 0" IsChecked="{Binding Sound}" VerticalAlignment="Center" Margin="12,0,0,0"
+                        ToolTip="Suono quando il timer arriva a zero (anche a timer già partito)" />
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                <RadioButton GroupName="LiveTimerCorner" Content="&#x2196;" IsChecked="{Binding CornerTopLeft}" Margin="0,0,6,0" ToolTip="Angolo in alto a sinistra" />
+                <RadioButton GroupName="LiveTimerCorner" Content="&#x2197;" IsChecked="{Binding CornerTopRight}" Margin="0,0,6,0" ToolTip="Angolo in alto a destra" />
+                <RadioButton GroupName="LiveTimerCorner" Content="&#x2199;" IsChecked="{Binding CornerBottomLeft}" Margin="0,0,6,0" ToolTip="Angolo in basso a sinistra" />
+                <RadioButton GroupName="LiveTimerCorner" Content="&#x2198;" IsChecked="{Binding CornerBottomRight}" Margin="0" ToolTip="Angolo in basso a destra" />
+              </StackPanel>
+              <Rectangle />
+            </DockPanel>
+
             <!-- GO / Torna al Tappo / PANIC: sempre qui, sempre grandi -->
-            <Grid Grid.Row="4">
+            <Grid Grid.Row="6">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="10" />

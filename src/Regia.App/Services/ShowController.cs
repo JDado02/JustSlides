@@ -21,7 +21,7 @@ public sealed class ShowController : IDisposable
     private static readonly HashSet<string> PersistedProperties =
     [
         nameof(MediaItem.Session), nameof(MediaItem.SessionEdited), nameof(MediaItem.Speaker),
-        nameof(MediaItem.Volume), nameof(MediaItem.VideoEnd), nameof(MediaItem.Excluded)
+        nameof(MediaItem.Volume), nameof(MediaItem.VideoEnd), nameof(MediaItem.Excluded), nameof(MediaItem.Timer)
     ];
 
     private readonly ShowStore _store;
